@@ -15,14 +15,18 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Hashtable;
 import java.util.List;
 import xklusac.extensions.Input;
 import xklusac.extensions.Output;
 import xklusac.plugins.Plugin;
 import java.util.LinkedList;
+import java.util.Locale;
+import java.util.TimeZone;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.jfree.data.time.Minute;
 
 /**
  * Class ResultCollector<p>
@@ -854,13 +858,14 @@ public class ResultCollector {
             ex.printStackTrace();
         }
     }
+
     public void recordSystemThroughput(double time, Hashtable<String, User> users) {
         try {
             String th = Math.round(time / (1)) + "\t";
-            Object[] keys = ExperimentSetup.users.keySet().toArray();
+
             for (int i = 0; i < ExperimentSetup.users.size(); i++) {
-                User u = ExperimentSetup.users.get((String) keys[i]);
-                th += u.getStarted_jobs()+"\t";
+                User u = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(i));
+                th += u.getStarted_jobs() + "\t";
             }
 
             out.writeStringWriterErr(pwt, th.replace(".", ","));
@@ -873,30 +878,38 @@ public class ResultCollector {
     public void recordFairshareFactor(double time, Hashtable<String, User> users) {
         try {
             String th = Math.round(time / (1)) + "\t";
-            Object[] keys = ExperimentSetup.users.keySet().toArray();
             for (int i = 0; i < ExperimentSetup.users.size(); i++) {
-                User u = ExperimentSetup.users.get((String) keys[i]);
-                th += Math.round(u.getFairshare_factor()*10000)/10000.0+"\t";
+                User u = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(i));
+                th += Math.round(u.getFairshare_factor() * 10000) / 10000.0 + "\t";
             }
-
             out.writeStringWriterErr(pwf, th.replace(".", ","));
+            //System.out.println("FF: " + th);
 
         } catch (IOException ex) {
             ex.printStackTrace();
         }
     }
+
     public void recordUserUsage(double time, Hashtable<String, User> users) {
         try {
             String th = Math.round(time / (1)) + "\t";
             String un = "";
-            Object[] keys = ExperimentSetup.users.keySet().toArray();
+
             for (int i = 0; i < ExperimentSetup.users.size(); i++) {
-                User u = ExperimentSetup.users.get((String) keys[i]);
+                User u = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(i));
                 //un += u.getName()+"x";
-                th += Math.round(u.getCumul_usage()/36.0)/100.0+"\t";  // CPU secs -> CPU hours
+                
+                th += Math.round((u.getCumul_usage() + u.getRunningUsage()) / 3.60) / 1000.0 + "\t";  // CPU secs -> CPU hours
+
+                //System.out.println(u.getName()+" running usage+cumul="+Math.round(u.getRunningUsage())+" + "+Math.round(u.getCumul_usage()));
+                Date date = new java.util.Date(Math.round(GridSim.clock() + Scheduler.start_date) * 1000);
+                u.series_u.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
+                u.series_ff.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round(u.getFairshare_factor() * 10000) / 10000.0);
+                u.series_c_u.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
+
             }
             th += un;
-
+            //System.out.println("Usage: " + th + " total="+Math.round(Scheduler.calculate_total_usage() / 3.60) / 1000.0);
             out.writeStringWriterErr(pwu, th.replace(".", ","));
 
         } catch (IOException ex) {

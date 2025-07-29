@@ -5,6 +5,7 @@ import eduni.simjava.Sim_event;
 import gridsim.*;
 import java.io.IOException;
 import java.util.*;
+import org.jfree.data.time.TimeSeriesCollection;
 import xklusac.objective_functions.CommonObjectives;
 import xklusac.extensions.*;
 
@@ -27,6 +28,9 @@ public class Scheduler extends GridSim {
      * list of Resources
      */
     private LinkedList resList;
+
+    public static String scheduling_algorithm = "";
+
     /**
      * list of ResourceInfo objects
      */
@@ -725,10 +729,12 @@ public class Scheduler extends GridSim {
 
             if (ev.get_tag() == AleaSimTags.SCHEDULER_PRINT_THROUGHPUT) {
                 //System.out.println("Now simtime = " + (Math.round(clock()/(3600*24))) + ", completed = " + received + " jobs. ");
+                resetTemporaryUsageAndUpdateFF();
+                this.updateFairShare();
                 ExperimentSetup.result_collector.recordSystemThroughput(clock(), ExperimentSetup.users); //received
                 ExperimentSetup.result_collector.recordFairshareFactor(clock(), ExperimentSetup.users);
                 ExperimentSetup.result_collector.recordUserUsage(clock(), ExperimentSetup.users);
-                super.sim_schedule(this.getEntityId(this.getEntityName()), (3600), AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
+                super.sim_schedule(this.getEntityId(this.getEntityName()), (60), AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
                 continue;
             }
 
@@ -745,7 +751,7 @@ public class Scheduler extends GridSim {
             }
 
             if (ev.get_tag() == AleaSimTags.FAIRSHARE_WEIGHT_DECAY && ExperimentSetup.use_fairshare) {
-                System.out.println("Now waiting = " + getQueueSize() + ", simtime = " + Math.round(clock()) + ", running = " + getRunningJobs() + " jobs. Performing fairshare decay...");
+                //System.out.println("Now waiting = " + getQueueSize() + ", simtime = " + Math.round(clock()) + ", running = " + getRunningJobs() + " jobs. Performing fairshare decay...");
                 applyDecay();
                 //decreaseFairShare();
                 super.sim_schedule(this.getEntityId(this.getEntityName()), (ExperimentSetup.decay_interval * 3600.0), AleaSimTags.FAIRSHARE_WEIGHT_DECAY);
@@ -860,6 +866,9 @@ public class Scheduler extends GridSim {
                 if (prev_scheduled == 0) {
                     scheduleGridlets();
                 }
+                
+                // periodic scheduling attempt (PBS verif only)
+                //super.sim_schedule(this.getEntityId(this.getEntityName()), (3600), AleaSimTags.EVENT_SCHEDULE);
                 continue;
             }
             // Failure appeared
@@ -1036,7 +1045,10 @@ public class Scheduler extends GridSim {
 
                 //update fairshare factor
                 if (ExperimentSetup.use_fairshare || true) {
+                    User u = ExperimentSetup.users.get(gridlet_received.getUser());
+                    u.getRunning_jobs().remove(gridlet_received);
                     updateUsageAndFFafterCompletion(gridlet_received);
+
                 }
 
                 if (received % 10 == 0) {
@@ -1115,8 +1127,8 @@ public class Scheduler extends GridSim {
                     last_event = GridSim.clock();
                 }
 
-                // cancel all jobs that cannot be executed due to missing properties
-                if (!isGridletExecutable(gi)) {
+                // cancel all jobs that cannot be executed due to missing properties                
+                if (!isGridletExecutable(gi) || gi.getLength() < 0) {
                     bad++;
                     System.out.println(Math.round(clock()) + " gridlet ID: " + gi.getID() + ": Error - unexecutable. Requirements: properties[" + gi.getProperties() + "], total CPUs=" + gi.getNumPE() + ", RAM=" + gi.getRam() + ", CPU per node=" + gi.getPpn() + ", #nodes=" + gi.getNumNodes());
                     try {
@@ -1197,6 +1209,9 @@ public class Scheduler extends GridSim {
                             + "tried jobs " + tried_queue.size() + ", Day: " + dated + " SimClock: " + Math.round(clock()));
 
                 }
+                
+                User usr = ExperimentSetup.users.get(gi.getUser());
+                usr.setQueued_jobs(usr.getQueued_jobs()+1);
 
                 // update total sched. generation time
                 Date d2 = new Date();
@@ -1245,6 +1260,7 @@ public class Scheduler extends GridSim {
             // NEW: created object SchedulerData
             SchedulerData sd = new SchedulerData(av_PEs, wav_PEs, failure_time, wfailure_time, clock, runtime, classic_load, max_load, submitted);
             rc.computeResults(sd);
+            drawCharts();
         }
         // shut down I/O ports, turn off this entity
         shutdownUserEntity();
@@ -1701,7 +1717,7 @@ public class Scheduler extends GridSim {
 
         }
         User u = ExperimentSetup.users.get(gi.getUser());
-        u.setQueued_jobs(u.getQueued_jobs() + 1);
+        //u.setQueued_jobs(u.getQueued_jobs() + 1);
         // set FairShare priority of this job
         updateFairshareFactorPriority(gi);
 
@@ -1814,11 +1830,12 @@ public class Scheduler extends GridSim {
 
     }
 
-    private void updateFairShare() {
+    public void updateFairShare() {
         Object[] keys = ExperimentSetup.users.keySet().toArray();
         for (int i = 0; i < ExperimentSetup.users.size(); i++) {
             User u = ExperimentSetup.users.get((String) keys[i]);
             updateUserFairshareFactor(u);
+            //System.out.println("Updating u:"+u.getName()+" FF = "+u.getFairshare_factor()+" with running usage:"+u.getRunningUsage()+ " and total usage:"+calculate_total_usage());
         }
     }
 
@@ -1838,11 +1855,11 @@ public class Scheduler extends GridSim {
             u.setLast_temp_timestamp(time);
 
             updateUserFairshareFactor(u);
-            System.out.println("Doing decay for user: " + u.getName() + " usage: " + prev_usage + " decayed: " + usage_decay + ", FF(old): " + prev_ff + " FF(new): " + u.getFairshare_factor());
+            //System.out.println("Doing decay for user: " + u.getName() + " usage: " + prev_usage + " decayed: " + usage_decay + ", FF(old): " + prev_ff + " FF(new): " + u.getFairshare_factor());
         }
     }
 
-    public void updateTemporaryUsageAndFF(GridletInfo gi) {
+    public void updateTemporaryUsageAndFFuponJobStart(GridletInfo gi) {
         User u = ExperimentSetup.users.get(gi.getUser());
         long prev_usage = u.getTemporary_usage();
         // estimated job usage
@@ -1858,9 +1875,11 @@ public class Scheduler extends GridSim {
         for (int i = 0; i < ExperimentSetup.users.size(); i++) {
             User u = ExperimentSetup.users.get((String) keys[i]);
             long time = Math.round(GridSim.clock());
-            if (time > u.getLast_temp_timestamp()+(20*60)) {
+            if (time > u.getLast_temp_timestamp() + (1)) { //20*60 - 20 minutes originaly, (1): pbs verif strict 
                 u.setTemporary_usage(0);
                 u.setLast_temp_timestamp(time);
+            }else{
+                //System.out.println("Same timestamp:"+time+" = "+u.getLast_temp_timestamp());
             }
             updateUserFairshareFactor(u);
         }
@@ -1880,7 +1899,7 @@ public class Scheduler extends GridSim {
 
     private void updateUserFairshareFactor(User u) {
         double ff = 0.5;
-        double tree_usage = (u.getCumul_usage() + u.getTemporary_usage()) / calculate_total_usage();
+        double tree_usage = (u.getCumul_usage() + u.getTemporary_usage() + u.getRunningUsage()) / calculate_total_usage();
         double target_usage = u.getUser_share() / calculate_total_shares();
         ff = Math.pow(2, -(tree_usage / target_usage));
         u.setFairshare_factor(ff);
@@ -1891,7 +1910,7 @@ public class Scheduler extends GridSim {
         Object[] keys = ExperimentSetup.users.keySet().toArray();
         for (int i = 0; i < ExperimentSetup.users.size(); i++) {
             User u = ExperimentSetup.users.get((String) keys[i]);
-            tu += u.getCumul_usage() + u.getTemporary_usage();
+            tu += u.getCumul_usage() + u.getTemporary_usage() + u.getRunningUsage();
         }
         return Math.max(tu, 0.00000001);
     }
@@ -1904,6 +1923,38 @@ public class Scheduler extends GridSim {
             ts += u.getUser_share();
         }
         return Math.max(ts, 1.0);
+    }
+
+    public void drawCharts() {
+        TimeSeriesCollection dataset_ff = new TimeSeriesCollection();
+        TimeSeriesCollection dataset_usage = new TimeSeriesCollection();
+        TimeSeriesCollection dataset_cumul_usage = new TimeSeriesCollection();
+
+        Object[] keys = ExperimentSetup.users.keySet().toArray();
+        for (int u = 0; u < ExperimentSetup.users.size(); u++) {
+            User us = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(u));
+            dataset_usage.addSeries(us.series_u);
+            dataset_ff.addSeries(us.series_ff);
+            dataset_cumul_usage.addSeries(us.series_c_u);
+        }
+
+        int width = 500;
+        int height = 300;
+
+        if (ExperimentSetup.use_decay) {
+            TimeSeriesChart example = new TimeSeriesChart("Fairshare Factor", Scheduler.scheduling_algorithm + " - Decay applied", dataset_ff, true, width, height);
+        } else {
+            TimeSeriesChart example = new TimeSeriesChart("Fairshare Factor", Scheduler.scheduling_algorithm + " - No Decaying applied", dataset_ff, true, width, height);
+        }
+        //TimeSeriesChart exampleu = new TimeSeriesChart(prefix + "Usage in time", "", dataset_usage, false, width, height);
+
+        if (ExperimentSetup.use_decay) {
+
+            TimeSeriesChart examplecu = new TimeSeriesChart("Cumulative Usage", Scheduler.scheduling_algorithm + " - Decay applied", dataset_cumul_usage, false, width, height);
+        } else {
+            TimeSeriesChart examplecu = new TimeSeriesChart("Cumulative Usage", Scheduler.scheduling_algorithm + " - No Decaying applied", dataset_cumul_usage, false, width, height);
+        }
+
     }
 
     /**
@@ -2069,7 +2120,9 @@ public class Scheduler extends GridSim {
         started++;
         User u = ExperimentSetup.users.get(gl.getUser());
         u.setStarted_jobs(u.getStarted_jobs() + 1);
-
+        u.getRunning_jobs().add(gl);
+        //System.out.println(gl.getUser()+" starting:"+gl.getGridletID()+", new ff: "+ExperimentSetup.users.get(gl.getUser()).getFairshare_factor()+" time: "+GridSim.clock()+" FREE CPUs left = "+ getFreeCPUs()+", Total shares="+calculate_total_shares());
+        //System.out.println("------EoS-----");
         //System.out.println("[SCHEDULER] Job " + gl.getGridletID() + " from " + gl.getArchRequired() + " is submitted to cluster " + GridSim.getEntityName(resID) + ", FREE CPUs left = " + getFreeCPUs() + " at sim. time = " + GridSim.clock());
     }
 

@@ -644,6 +644,7 @@ public class ResourceInfo {
         if (Scheduler.use_job_special_requests == false && ExperimentSetup.use_RAM == false) {
 
             if (this.getNumRunningPE() >= gi.getNumPE()) {
+                //System.out.println(gi.getID() + " can run here at " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " >= " + gi.getNumPE());
                 return true;
             } else {
                 System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());

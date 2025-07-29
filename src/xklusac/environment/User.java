@@ -4,7 +4,10 @@
  */
 package xklusac.environment;
 
+import gridsim.GridSim;
 import java.util.ArrayList;
+import java.util.LinkedList;
+import org.jfree.data.time.TimeSeries;
 
 /**
  *
@@ -26,6 +29,11 @@ public class User {
     private long last_temp_timestamp;
     private long queued_jobs;
     private long started_jobs;
+    private LinkedList<ComplexGridlet> running_jobs = new LinkedList();
+
+    TimeSeries series_u;
+    TimeSeries series_ff;
+    TimeSeries series_c_u;
 
     public User(String name) {
         this.setName(name);
@@ -34,16 +42,20 @@ public class User {
         this.setResponse(0.0);
         this.setRuntime(0.0);
         this.setWait(0.0);
-        this.setCumul_usage(0);
+        this.setCumul_usage(1);
         this.setTemporary_usage(0);
         this.setFairshare_factor(1.0);
         this.setUser_share(1);
         this.setLast_temp_timestamp(0);
         this.setQueued_jobs(0);
         this.setStarted_jobs(0);
-        System.out.println("New USER created: "+name);
-        
+        System.out.println("New USER created: " + name);
+        ExperimentSetup.user_logins.add(name);
+
         this.percentages = new ArrayList<Double>();
+        series_u = new TimeSeries(name);
+        series_ff = new TimeSeries(name);
+        series_c_u = new TimeSeries(name);
     }
 
     public int getJobs() {
@@ -176,6 +188,18 @@ public class User {
         return cumul_usage;
     }
 
+    public long getRunningUsage() {
+        long running_usage = 0;
+        for (int i = 0; i < running_jobs.size(); i++) {
+            ComplexGridlet gl = running_jobs.get(i);
+            double runtime = GridSim.clock() - gl.getExecStartTime();
+            running_usage += Math.round(gl.getNumPE() * runtime * ExperimentSetup.PBS_factor);
+            //System.out.println(gl.getGridletID()+ " runtime so far: "+runtime);
+        }
+        //System.out.println("Running usage is for user " + this.getName() + " is: " + running_usage + " at time: " + Math.round(GridSim.clock()));
+        return running_usage;
+    }
+
     /**
      * @param cumul_usage the cumul_usage to set
      */
@@ -215,7 +239,8 @@ public class User {
      * @return the temporary_usage
      */
     public long getTemporary_usage() {
-        return temporary_usage;
+       return Math.round(temporary_usage * 1.0);        // 0.01=PBS verif | 1.0=synt.exp tiny, small, medium... 
+       //return temporary_usage;
     }
 
     /**
@@ -265,5 +290,19 @@ public class User {
      */
     public void setStarted_jobs(long started_jobs) {
         this.started_jobs = started_jobs;
+    }
+
+    /**
+     * @return the running_jobs
+     */
+    public LinkedList<ComplexGridlet> getRunning_jobs() {
+        return running_jobs;
+    }
+
+    /**
+     * @param running_jobs the running_jobs to set
+     */
+    public void setRunning_jobs(LinkedList<ComplexGridlet> running_jobs) {
+        this.running_jobs = running_jobs;
     }
 }

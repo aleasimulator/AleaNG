@@ -387,7 +387,7 @@ public class SWFLoader extends GridSim {
         double perc = norm.sample();
 
         job_limit = Math.max(1, Math.round(job_limit / ExperimentSetup.runtime_minimizer));
-        length = Math.max(1, Math.round(length / ExperimentSetup.runtime_minimizer));
+        length = Math.max(1.0, Math.round(length / ExperimentSetup.runtime_minimizer));
         estimatedLength = Math.max(1, Math.round(estimatedLength / ExperimentSetup.runtime_minimizer));
 
         if (!Scheduler.all_queues_names.contains(queue) && ExperimentSetup.use_queues) {
@@ -447,6 +447,23 @@ public class SWFLoader extends GridSim {
        */
         
         // END of synth experiment
+        
+        // DATA for PBS comparison experiment
+        gpus_per_node = Math.min(0, gpus_per_node);
+        length = Math.min(length, 3600*168);
+        
+        if(numCPU<=4){
+            user = "tiny";
+        }else if (numCPU>4 && numCPU<=8){
+            user = "small";
+        
+        }else if (numCPU>8 && numCPU<=16){
+            user = "medium";
+        }else{
+            user = "large";
+        }
+        
+        //System.out.println("su "+user+" -c \"cd; qsub -l walltime=2:00:00 -m n -o /dev/null -e /dev/null -l select=${"+numCPU+"}:ncpus=1:mem=300mb -- /usr/bin/sleep $"+(length)+"\"");
         
         ComplexGridlet gl = new ComplexGridlet(id, user, job_limit, (length), estimatedLength, 0, 0,
                 "Linux", arch, arrival, deadline, 1, numCPU, 0.0, queue, properties, perc, ram, numNodes, ppn, gpus_per_node, precedingJobs);

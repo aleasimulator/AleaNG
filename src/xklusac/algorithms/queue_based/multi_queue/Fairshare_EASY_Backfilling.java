@@ -15,6 +15,7 @@ import xklusac.environment.ExperimentSetup;
 import xklusac.environment.GridletInfo;
 import xklusac.environment.ResourceInfo;
 import xklusac.environment.Scheduler;
+import xklusac.environment.User;
 import xklusac.extensions.FairshareFactorComparator;
 import xklusac.extensions.WallclockComparator;
 
@@ -75,34 +76,66 @@ public class Fairshare_EASY_Backfilling implements SchedulingPolicy {
             }
 
             if (Scheduler.queue.size() > 0) {
-                GridletInfo gi = (GridletInfo) Scheduler.queue.getFirst();
-                for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
-                    ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
-                    if (Scheduler.isSuitable(ri, gi) && ri.canExecuteNow(gi)) {
-                        int speed = ri.peRating;
-                        if (speed > r_cand_speed) {
-                            r_cand = ri;
-                            r_cand_speed = speed;
+                /*System.out.println("---BF start---");
+                for(int us = 0; us < ExperimentSetup.user_logins.size(); us++){
+                        User usr = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(us));
+                        System.out.print("User "+usr.getName()+"("+usr.getQueued_jobs()+") FF:"+usr.getFairshare_factor()+", ");
+                    }
+                System.out.println("");*/
+
+                String top_user = Scheduler.queue.getFirst().getUser();
+
+                int u_index = 0;
+                //while (true) {
+
+                    GridletInfo gi = (GridletInfo) Scheduler.queue.get(u_index);
+                    if (!gi.getUser().equals(top_user)) {
+                        break;
+                    }
+
+                    for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
+                        ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
+                        if (Scheduler.isSuitable(ri, gi) && ri.canExecuteNow(gi)) {
+                            int speed = ri.peRating;
+                            if (speed > r_cand_speed) {
+                                r_cand = ri;
+                                r_cand_speed = speed;
+                            }
                         }
                     }
-                }
 
-                if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.removeFirst();
-                    r_cand.addGInfoInExec(gi);
-                    // set the resource ID for this gridletInfo (this is the final scheduling decision)
-                    gi.setResourceID(r_cand.resource.getResourceID());
-                    if (ExperimentSetup.use_fairshare) {
-                        // add additional usage for this user to update his or her fairshare factor
-                        scheduler.updateTemporaryUsageAndFF(gi);
+                    if (r_cand != null) {
+                        gi = (GridletInfo) Scheduler.queue.remove(u_index);
+                        r_cand.addGInfoInExec(gi);
+                        // set the resource ID for this gridletInfo (this is the final scheduling decision)
+                        gi.setResourceID(r_cand.resource.getResourceID());
+                        User u = ExperimentSetup.users.get(gi.getUser());
+                        u.setQueued_jobs(u.getQueued_jobs() - 1);
+
+                        /*for(int us = 0; us < ExperimentSetup.user_logins.size(); us++){
+                        User usr = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(us));
+                        System.out.print("User "+usr.getName()+"("+usr.getQueued_jobs()+") FF:"+usr.getFairshare_factor()+", ");
+                        }
+                        System.out.println();
+                        System.out.println(gi.getID() + " starting, owner " + gi.getUser()+" remaining jobs "+u.getQueued_jobs()+" ff: "+ExperimentSetup.users.get(gi.getUser()).getFairshare_factor()+" time: "+GridSim.clock());
+                         */
+                        if (ExperimentSetup.use_fairshare) {
+                            // add additional usage for this user to update his or her fairshare factor
+                            scheduler.updateTemporaryUsageAndFFuponJobStart(gi);
+                        }
+                        // tell the JSS where to send which gridlet
+                        scheduler.submitJob(gi.getGridlet(), r_cand.resource.getResourceID());
+                        succ = true;
+                        r_cand.is_ready = true;
+                        //scheduler.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"),  0.0, AleaSimTags.GRIDLET_SENT, gi);
+                        return 1;
+                    } else {
+                        u_index++;
+                        if (u_index >= Scheduler.queue.size()) {
+                            return 0;
+                        }
                     }
-                    // tell the JSS where to send which gridlet
-                    scheduler.submitJob(gi.getGridlet(), r_cand.resource.getResourceID());
-                    succ = true;
-                    r_cand.is_ready = true;
-                    //scheduler.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"),  0.0, AleaSimTags.GRIDLET_SENT, gi);
-                    return 1;
-                }
+                //}
             } else {
                 return 0;
             }
@@ -166,10 +199,14 @@ public class Fairshare_EASY_Backfilling implements SchedulingPolicy {
                         ri.addGInfoInExec(gi);
                         // set the resource ID for this gridletInfo (this is the final scheduling decision)
                         gi.setResourceID(ri.resource.getResourceID());
+
+                        User u = ExperimentSetup.users.get(gi.getUser());
+                        u.setQueued_jobs(u.getQueued_jobs() - 1);
+
                         if (ExperimentSetup.use_fairshare) {
-                        // add additional usage for this user to update his or her fairshare factor
-                        scheduler.updateTemporaryUsageAndFF(gi);
-                    }
+                            // add additional usage for this user to update his or her fairshare factor
+                            scheduler.updateTemporaryUsageAndFFuponJobStart(gi);
+                        }
                         // submit job
                         scheduler.submitJob(gi.getGridlet(), ri.resource.getResourceID());
                         ExperimentSetup.backfilled++;

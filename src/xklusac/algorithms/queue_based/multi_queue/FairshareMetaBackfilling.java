@@ -85,7 +85,7 @@ public class FairshareMetaBackfilling implements SchedulingPolicy {
                     gi.setResourceID(r_cand.resource.getResourceID());
                     if (ExperimentSetup.use_fairshare) {
                         // add additional usage for this user to update his or her fairshare factor
-                        scheduler.updateTemporaryUsageAndFF(gi);
+                        scheduler.updateTemporaryUsageAndFFuponJobStart(gi);
                     }
                     //System.out.println(gi.getID()+" start in queue "+gi.getQueue()+", avail:"+ExperimentSetup.queues.get(gi.getQueue()).getAvailCPUs()+" of "+ExperimentSetup.queues.get(gi.getQueue()).getLimit()+" req:"+gi.getNumPE());
                     scheduler.submitJob(gi.getGridlet(), r_cand.resource.getResourceID());

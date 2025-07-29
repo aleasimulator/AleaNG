@@ -154,6 +154,9 @@ public class ExperimentSetup {
      * set of users in the system
      */
     public static Hashtable<String, User> users = new Hashtable<String, User>();
+    
+    public static LinkedList<String> user_logins = new LinkedList<String>();
+    
     /**
      * set of queues in the system
      */
@@ -275,6 +278,8 @@ public class ExperimentSetup {
      * defines whether to use fairshare decay
      */
     public static boolean use_decay;
+    
+    public static double PBS_factor = 1.0;
     
     public static int decay_interval;
     public static double decay_factor;
@@ -457,6 +462,7 @@ public class ExperimentSetup {
         use_fairshare_RAM = aCfg.getBoolean("use_fairshare_RAM");
         use_fairshare = aCfg.getBoolean("use_fairshare");
         use_decay = aCfg.getBoolean("use_decay");
+        PBS_factor = aCfg.getDouble("PBS_factor");
         decay_interval = aCfg.getInt("decay_interval");
         decay_factor = aCfg.getDouble("decay_factor");
         multiply_sums = aCfg.getBoolean("multiply_sums");
@@ -769,9 +775,11 @@ public class ExperimentSetup {
                     policy = new FairshareFCFS(scheduler);
                     // Fairshare ordered FCFS
                     suff = "FairShareFCFS";
+                    Scheduler.scheduling_algorithm = "Strict Ordering";
                 }
                 if (alg == 8) {
                     policy = new FairshareMetaBackfilling(scheduler);
+                    Scheduler.scheduling_algorithm = "Aggressive Backfilling";
                     // Backfilling without a reservation
                     suff = "FairShareMetaBackfilling";
                     if (anti_starvation) {
@@ -885,6 +893,7 @@ public class ExperimentSetup {
 
                 if (alg == 22) {
                     policy = new Fairshare_EASY_Backfilling(scheduler);
+                    Scheduler.scheduling_algorithm = "Easy Backfilling";
                     // fixed version of EASY Backfilling
                     suff = "EASY-Fair";
                 }

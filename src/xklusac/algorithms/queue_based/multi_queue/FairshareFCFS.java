@@ -82,15 +82,21 @@ public class FairshareFCFS implements SchedulingPolicy {
                     r_cand.addGInfoInExec(gi);
                     // set the resource ID for this gridletInfo (this is the final scheduling decision)
                     gi.setResourceID(r_cand.resource.getResourceID());
-                    
+
                     User u = ExperimentSetup.users.get(gi.getUser());
                     u.setQueued_jobs(u.getQueued_jobs() - 1);
                     //u.setStarted_jobs(u.getStarted_jobs()+1);
 
-                    //System.out.print(gi.getID() + " starting, owner " + gi.getUser()+" remaining jobs "+u.getQueued_jobs()+" ff: "+ExperimentSetup.users.get(gi.getUser()).getFairshare_factor()+" time: "+GridSim.clock());
+                    /*for(int us = 0; us < ExperimentSetup.user_logins.size(); us++){
+                        User usr = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(us));
+                        System.out.print("User "+usr.getName()+"("+usr.getQueued_jobs()+") FF:"+usr.getFairshare_factor()+", ");
+                    }
+                    System.out.println();
+                    System.out.println(gi.getID() + " starting, owner " + gi.getUser()+" remaining jobs "+u.getQueued_jobs()+" ff: "+ExperimentSetup.users.get(gi.getUser()).getFairshare_factor()+" time: "+GridSim.clock());
+                     */
                     if (ExperimentSetup.use_fairshare) {
                         // add additional usage for this user to update his or her fairshare factor
-                        scheduler.updateTemporaryUsageAndFF(gi);
+                        scheduler.updateTemporaryUsageAndFFuponJobStart(gi);
                     }
                     //System.out.println(" new ff: "+ExperimentSetup.users.get(gi.getUser()).getFairshare_factor()+" time: "+GridSim.clock());
                     //System.out.println("-------end--------");
