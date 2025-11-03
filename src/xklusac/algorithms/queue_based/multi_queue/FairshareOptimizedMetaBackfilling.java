@@ -39,7 +39,7 @@ public class FairshareOptimizedMetaBackfilling implements SchedulingPolicy {
         LinkedList queue = Scheduler.all_queues.get(index);
         queue.addLast(gi);
         Scheduler.runtime += (new Date().getTime() - runtime1);
-        //System.out.println(gi.getQueue() + " New job has been received in queue " + index);
+        //System.out.println(gi.getQueue() + " New job has been received in active_scheduling_queue " + index);
     }
 
     @Override
@@ -57,13 +57,13 @@ public class FairshareOptimizedMetaBackfilling implements SchedulingPolicy {
         //System.out.println("------- mazu rezervace -------");
 
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
-            Scheduler.queue = Scheduler.all_queues.get(q);
+            Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
             if (ExperimentSetup.use_fairshare) {
-                Collections.sort(Scheduler.queue, new WallclockComparator());
+                Collections.sort(Scheduler.active_scheduling_queue, new WallclockComparator());
             }
-            //System.out.println(Scheduler.queue.size()+" jobs in queue "+Scheduler.all_queues_names.get(q));
-            for (int i = 0; i < Scheduler.queue.size(); i++) {
-                GridletInfo gi = (GridletInfo) Scheduler.queue.get(i);
+            //System.out.println(Scheduler.active_scheduling_queue.size()+" jobs in active_scheduling_queue "+Scheduler.all_queues_names.get(q));
+            for (int i = 0; i < Scheduler.active_scheduling_queue.size(); i++) {
+                GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(i);
                 for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                     ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
 
@@ -73,12 +73,12 @@ public class FairshareOptimizedMetaBackfilling implements SchedulingPolicy {
                     }
                 }
                 if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.remove(i);
+                    gi = (GridletInfo) Scheduler.active_scheduling_queue.remove(i);
                     //System.err.println(gi.getID()+" PEs size = "+gi.PEs.size());
                     r_cand.addGInfoInExec(gi);
                     // set the resource ID for this gridletInfo (this is the final scheduling decision)
                     gi.setResourceID(r_cand.resource.getResourceID());
-                    //System.out.println(gi.getID()+" start in queue "+gi.getQueue()+", avail:"+ExperimentSetup.queues.get(gi.getQueue()).getAvailCPUs()+" of "+ExperimentSetup.queues.get(gi.getQueue()).getLimit()+" req:"+gi.getNumPE());
+                    //System.out.println(gi.getID()+" start in active_scheduling_queue "+gi.getQueue()+", avail:"+ExperimentSetup.queues.get(gi.getQueue()).getQueueAvailCPUs()+" of "+ExperimentSetup.queues.get(gi.getQueue()).getLimit()+" req:"+gi.getNumPE());
                     scheduler.submitJob(gi.getGridlet(), r_cand.resource.getResourceID());
                     r_cand.is_ready = true;
                     //scheduler.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.GRIDLET_SENT, gi);
@@ -87,16 +87,17 @@ public class FairshareOptimizedMetaBackfilling implements SchedulingPolicy {
                     r_cand = null;
                     i--;
                     if (backfill) {
+                        gi.getGridlet().setBackfilled(1);
                         ExperimentSetup.backfilled++;
-                        //System.out.println(gi.getID() + ": backfilled. Queue size = " + Scheduler.queue.size());
+                        //System.out.println(gi.getID() + ": backfilled. Queue size = " + Scheduler.active_scheduling_queue.size());
                     }
                     return scheduled;
                 } else {
                     //if (ExperimentSetup.use_anti_starvation && (GridSim.clock() - gi.getRelease_date()) > Math.min(gi.getJobLimit()/gi.getNumPE(), 3600*12.0)) {
                     //if (ExperimentSetup.use_anti_starvation && (GridSim.clock() - gi.getRelease_date()) > Math.min(gi.getJobLimit()/4.0, 3600*12.0)) {
                     if (ExperimentSetup.anti_starvation && !gi.getQueue().equals("backfill")) {
-                        if (ExperimentSetup.use_queues) {
-                            int avail = ExperimentSetup.queues.get(gi.getQueue()).getAvailCPUs();
+                        if (ExperimentSetup.use_multiple_queues) {
+                            int avail = ExperimentSetup.queues.get(gi.getQueue()).getQueueAvailCPUs();
                             // stradej pouze pokud fronta dovoluje
                             if (avail >= gi.getNumPE()) {
                                 // zacni stradani - oznac vsechny uzly vhodne pro ulohu
@@ -114,7 +115,7 @@ public class FairshareOptimizedMetaBackfilling implements SchedulingPolicy {
                             for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                                 ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
                                 if (Scheduler.isSuitable(ri, gi)) {
-                                    //System.out.println(Math.round(GridSim.clock())+" | "+gi.getID()+": stradam "+gi.getNumPE()+" CPU na "+ri.resource.getResourceName()+ " Queue size = " + Scheduler.queue.size());
+                                    //System.out.println(Math.round(GridSim.clock())+" | "+gi.getID()+": stradam "+gi.getNumPE()+" CPU na "+ri.resource.getResourceName()+ " Queue size = " + Scheduler.active_scheduling_queue.size());
                                     ri.markOptimalSuitableNodes(gi);
                                 }
                             }

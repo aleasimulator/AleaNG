@@ -45,7 +45,7 @@ public class BatchReader {
     BufferedReader br = null;
 
     public BatchReader(String name) {
-        br = r.openFile(new File(ExperimentSetup.data_sets + "/" + name));
+        br = r.openFile(new File(ExperimentSetup.data_sets_dir + "/" + name));
     }
 
     private JobBatchDynamic read_batch() {

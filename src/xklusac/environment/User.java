@@ -6,6 +6,7 @@ package xklusac.environment;
 
 import gridsim.GridSim;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import org.jfree.data.time.TimeSeries;
 
@@ -16,6 +17,7 @@ import org.jfree.data.time.TimeSeries;
 public class User {
 
     private String name;
+    private String login;
     private int jobs;
     private double slowdown;
     private double response;
@@ -29,13 +31,21 @@ public class User {
     private long last_temp_timestamp;
     private long queued_jobs;
     private long started_jobs;
+    private int quota;
+    private int used_quota;
     private LinkedList<ComplexGridlet> running_jobs = new LinkedList();
+    private LinkedList<Long> wait_times = new LinkedList();
+    private HashMap<Long,Long> arrival_wait_map = new HashMap<Long, Long>();
+    
 
     TimeSeries series_u;
     TimeSeries series_ff;
     TimeSeries series_c_u;
+    TimeSeries series_w;
 
-    public User(String name) {
+    public User(String name, String login) {
+        ExperimentSetup.user_logins.add(name);
+        this.setLogin(login);
         this.setName(name);
         this.setJobs(0);
         this.setSlowdown(0.0);
@@ -49,13 +59,16 @@ public class User {
         this.setLast_temp_timestamp(0);
         this.setQueued_jobs(0);
         this.setStarted_jobs(0);
-        System.out.println("New USER created: " + name);
-        ExperimentSetup.user_logins.add(name);
+        this.setUserQuota(0);
+        this.setUsed_quota(0);
+        System.out.println("New USER " + name+" arrived/created at SimClock: "+Math.round(GridSim.clock()));
+        
 
         this.percentages = new ArrayList<Double>();
-        series_u = new TimeSeries(name);
-        series_ff = new TimeSeries(name);
-        series_c_u = new TimeSeries(name);
+        series_u = new TimeSeries(login+" (id:"+name+")");
+        series_ff = new TimeSeries(login+" (id:"+name+")");
+        series_c_u = new TimeSeries(login+" (id:"+name+")");
+        series_w = new TimeSeries(login+" (id:"+name+")");
     }
 
     public int getJobs() {
@@ -196,8 +209,20 @@ public class User {
             running_usage += Math.round(gl.getNumPE() * runtime * ExperimentSetup.PBS_factor);
             //System.out.println(gl.getGridletID()+ " runtime so far: "+runtime);
         }
-        //System.out.println("Running usage is for user " + this.getName() + " is: " + running_usage + " at time: " + Math.round(GridSim.clock()));
+        //System.out.println("Running usage is for user " + this.getName() + " is: " + tick_usage + " at time: " + Math.round(GridSim.clock()));
         return running_usage;
+    }
+    
+     public long getLastTickUsage() {
+        long tick_usage = 0;
+        for (int i = 0; i < running_jobs.size(); i++) {
+            ComplexGridlet gl = running_jobs.get(i);
+            double tick_runtime = Math.min(ExperimentSetup.sample_tick, GridSim.clock() - gl.getExecStartTime());
+            tick_usage += Math.round(gl.getNumPE() * tick_runtime * ExperimentSetup.PBS_factor);
+            //System.out.println(gl.getGridletID()+ " runtime so far: "+runtime);
+        }
+        //System.out.println("Running usage is for user " + this.getName() + " is: " + tick_usage + " at time: " + Math.round(GridSim.clock()));
+        return tick_usage;
     }
 
     /**
@@ -225,6 +250,7 @@ public class User {
      * @return the user_share
      */
     public int getUser_share() {
+        //System.out.println(login+" share="+user_share);
         return user_share;
     }
 
@@ -305,4 +331,79 @@ public class User {
     public void setRunning_jobs(LinkedList<ComplexGridlet> running_jobs) {
         this.running_jobs = running_jobs;
     }
+
+    /**
+     * @return the quota
+     */
+    public int getUserQuota() {
+        return quota;
+    }
+
+    /**
+     * @param quota the quota to set
+     */
+    public void setUserQuota(int quota) {
+        this.quota = quota;
+    }
+
+    /**
+     * @return the used_quota
+     */
+    public int getUsed_quota() {
+        return used_quota;
+    }
+
+    /**
+     * @param used_quota the used_quota to set
+     */
+    public void setUsed_quota(int used_quota) {
+        this.used_quota = used_quota;
+    }
+    
+    public int getFreeQuota() {
+        return (getUserQuota() - getUsed_quota());
+    }
+
+    /**
+     * @return the login
+     */
+    public String getLogin() {
+        return login;
+    }
+
+    /**
+     * @param login the login to set
+     */
+    public void setLogin(String login) {
+        this.login = login;
+    }
+
+    /**
+     * @return the wait_times
+     */
+    public LinkedList<Long> getWait_times() {
+        return wait_times;
+    }
+
+    /**
+     * @param wait_times the wait_times to set
+     */
+    public void setWait_times(LinkedList<Long> wait_times) {
+        this.wait_times = wait_times;
+    }
+
+    /**
+     * @return the arrival_wait_map
+     */
+    public HashMap<Long,Long> getArrival_wait_map() {
+        return arrival_wait_map;
+    }
+
+    /**
+     * @param arrival_wait_map the arrival_wait_map to set
+     */
+    public void setArrival_wait_map(HashMap<Long,Long> arrival_wait_map) {
+        this.arrival_wait_map = arrival_wait_map;
+    }
+
 }

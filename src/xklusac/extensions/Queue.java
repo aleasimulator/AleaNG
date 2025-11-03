@@ -10,15 +10,16 @@ package xklusac.extensions;
  */
 public class Queue {
     private String name;
-    private int limit;
+    private int queue_CPU_limit;
     private int priority;
-    private int used;
+    private int queue_used_CPUs;
     
-    public Queue(String name, int limit, int priority){
+    public Queue(int id, String name, int limit, int priority){
         this.name = name;
-        this.limit = limit;
+        this.queue_CPU_limit = limit;
         this.priority = priority;
-        this.used = 0;
+        this.queue_used_CPUs = 0;
+        System.out.println("Creating queue: "+name+" with priority: "+priority+" and CPU limit: "+limit);
     }
 
     /**
@@ -36,17 +37,17 @@ public class Queue {
     }
 
     /**
-     * @return the limit
+     * @return the queue_CPU_limit
      */
-    public int getLimit() {
-        return limit;
+    public int getQueue_CPU_limit() {
+        return queue_CPU_limit;
     }
 
     /**
-     * @param limit the limit to set
+     * @param queue_CPU_limit the queue_CPU_limit to set
      */
-    public void setLimit(int limit) {
-        this.limit = limit;
+    public void setQueue_CPU_limit(int queue_CPU_limit) {
+        this.queue_CPU_limit = queue_CPU_limit;
     }
 
     /**
@@ -64,21 +65,23 @@ public class Queue {
     }
 
     /**
-     * @return the used
+     * @return the queue_used_CPUs
      */
-    public int getUsed() {
-        return used;
+    public int getQueue_used_CPUs() {
+        return queue_used_CPUs;
     }
 
     /**
-     * @param used the used to set
+     * @param used the queue_used_CPUs to set
      */
-    public void setUsed(int running) {
-        this.used = running;
+    public void setQueue_used_CPUs(int running) {
+        //System.out.println(this.name+": Setting used CPUs to: "+running);
+        this.queue_used_CPUs = running;
     }
     
-    public int getAvailCPUs() {
-        return (limit - used);
+    public int getQueueAvailCPUs() {
+        //System.out.println("| cpu_limit:"+queue_CPU_limit+" used:"+queue_used_CPUs+" |");
+        return (queue_CPU_limit - queue_used_CPUs);
     }
     
 }

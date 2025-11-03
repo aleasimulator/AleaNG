@@ -185,7 +185,7 @@ public class PWFLoader extends GridSim {
         int ppn = numCPU;
 
         ComplexGridlet gl = new ComplexGridlet(id, "John_Doe", job_limit, (length), (estimated), 10, 10,
-                "Linux", "Risc arch.", arrival, deadline_d, 1, numCPU, estimatedMachine, "q3", "", perc, 0, numNodes, ppn, 0, null);
+                "Linux", "Risc arch.", arrival, deadline_d, 1, numCPU, estimatedMachine, 0, "", perc, 0, numNodes, ppn, 0, null, 0);
 
         // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
         gl.setUserID(super.getEntityId("Alea_Job_Scheduler"));

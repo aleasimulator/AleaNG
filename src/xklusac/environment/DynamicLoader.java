@@ -215,6 +215,6 @@ public class DynamicLoader extends GridSim {
     }
 
     private String get_dataset_filename(String data_set) {
-        return ExperimentSetup.data_sets + "/" + data_set;
+        return ExperimentSetup.data_sets_dir + "/" + data_set;
     }
 }

@@ -18,8 +18,8 @@ import xklusac.extensions.WallclockComparator;
 
 /**
  * Class AggressiveBackfilling<p>
- * This class implements multi-queue priority-based fair share using scheduling
- * policy, similar to the algorithm applied in Czech NGI MetaCentrum.
+ This class implements multi-active_scheduling_queue priority-based fair share using scheduling
+ policy, similar to the algorithm applied in Czech NGI MetaCentrum.
  *
  * @author Dalibor Klusacek
  */
@@ -40,7 +40,7 @@ public class AggressiveBackfillingFastDeepHold implements SchedulingPolicy {
         }
         LinkedList queue = Scheduler.all_queues.get(index);
         queue.addLast(gi);
-        //System.out.println(gi.getID()+" New job is in queue: "+gi.getQueue()+" index "+index);
+        //System.out.println(gi.getID()+" New job is in active_scheduling_queue: "+gi.getQueue()+" index "+index);
         Scheduler.runtime += (new Date().getTime() - runtime1);
 
     }
@@ -69,28 +69,28 @@ public class AggressiveBackfillingFastDeepHold implements SchedulingPolicy {
         }
 
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
-            //System.out.println(q+" select queue "+Scheduler.all_queues_names.get(q) );
-            Scheduler.queue = Scheduler.all_queues.get(q);
+            //System.out.println(q+" select active_scheduling_queue "+Scheduler.all_queues_names.get(q) );
+            Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
             if (ExperimentSetup.use_fairshare) {
                 System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
-                Collections.sort(Scheduler.queue, new WallclockComparator());
+                Collections.sort(Scheduler.active_scheduling_queue, new WallclockComparator());
             } else if (ExperimentSetup.extract_jobs) {
                 System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
-                Collections.sort(Scheduler.queue, new ArrivalComparator());
+                Collections.sort(Scheduler.active_scheduling_queue, new ArrivalComparator());
             }
 
             if (max_free_CPUs < 1) {
-                Scheduler.tried_queue.addAll(Scheduler.queue);
-                Scheduler.queue.clear();
+                Scheduler.tried_queue.addAll(Scheduler.active_scheduling_queue);
+                Scheduler.active_scheduling_queue.clear();
                 return 0;
             }
 
-            // we go through the whole queue
-            while (Scheduler.queue.size() > 0) {
+            // we go through the whole active_scheduling_queue
+            while (Scheduler.active_scheduling_queue.size() > 0) {
 
-                GridletInfo gi = find_first_eligible_job(Scheduler.queue, max_free_CPUs);
+                GridletInfo gi = find_first_eligible_job(Scheduler.active_scheduling_queue, max_free_CPUs);
                 if (gi == null) {
-                    //System.out.println(Math.round(GridSim.clock())+" -no eligible job- : waiting in this queue("+q+"): "+Scheduler.queue.size()+ " of "+Scheduler.getQueueSize()+", free CPUs "+max_free_CPUs);
+                    //System.out.println(Math.round(GridSim.clock())+" -no eligible job- : waiting in this active_scheduling_queue("+q+"): "+Scheduler.active_scheduling_queue.size()+ " of "+Scheduler.getQueueSize()+", free CPUs "+max_free_CPUs);
                     break;
                 }
 
@@ -102,7 +102,7 @@ public class AggressiveBackfillingFastDeepHold implements SchedulingPolicy {
                     }
                 }
                 if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.remove(Scheduler.queue.indexOf(gi));
+                    gi = (GridletInfo) Scheduler.active_scheduling_queue.remove(Scheduler.active_scheduling_queue.indexOf(gi));
                     r_cand.addGInfoInExec(gi);
                     // set the resource ID for this gridletInfo (this is the final scheduling decision)
                     gi.setResourceID(r_cand.resource.getResourceID());
@@ -118,12 +118,12 @@ public class AggressiveBackfillingFastDeepHold implements SchedulingPolicy {
                     return scheduled;
                 } else {
                     Scheduler.tried_queue.add(gi);
-                    Scheduler.queue.remove(gi);
-                    //System.out.println(gi.getID()+" added to tried queue for now (will return) as it cannot run now.");
+                    Scheduler.active_scheduling_queue.remove(gi);
+                    //System.out.println(gi.getID()+" added to tried active_scheduling_queue for now (will return) as it cannot run now.");
                 }
 
-            }//we went through the whole queue
-        }//next queue
+            }//we went through the whole active_scheduling_queue
+        }//next active_scheduling_queue
         eligible_resources = null;
         return scheduled;
 
@@ -139,7 +139,7 @@ public class AggressiveBackfillingFastDeepHold implements SchedulingPolicy {
             // if (quota_free >= gi.getNumPE() && gi.getNumPE() <= max_free_cpu_res) {
             if (gi.getNumPE() <= max_free_cpu_res) {
                 //if(i>0){
-                //System.out.println(i+"th job "+gi.getID()+" from queue selected. Requires "+gi.getNumPE()+" CPU and avail: "+max_free_cpu_res+" req RAM = "+(gi.getRam()/(1024.0*1024))+" GB at time:"+GridSim.clock());
+                //System.out.println(i+"th job "+gi.getID()+" from active_scheduling_queue selected. Requires "+gi.getNumPE()+" CPU and avail: "+max_free_cpu_res+" req RAM = "+(gi.getRam()/(1024.0*1024))+" GB at time:"+GridSim.clock());
                 //System.out.println();
                 //}
                 return gi;
@@ -153,18 +153,18 @@ public class AggressiveBackfillingFastDeepHold implements SchedulingPolicy {
             } else {
                 Scheduler.tried_queue.add(gi);
                 queue.remove(i);
-                //System.out.println(gi.getID()+": moved to hold queue, group free= "+g.getFreeQuota()+" job req= "+gi.getNumPE()+" removed from position= "+i);
+                //System.out.println(gi.getID()+": moved to hold active_scheduling_queue, group free= "+g.getFreeQuota()+" job req= "+gi.getNumPE()+" removed from position= "+i);
                 i--;
                 //System.out.println(gi.getID()+": Quota limit exceeded: "+quota_free+" avail CPUs of limit: "+g.getQuota()+" group "+g.getName());
                 //System.out.println(gi.getID()+": group free "+ExperimentSetup.groups.get(gi.getGroup()).getFreeQuota() +" of "+ExperimentSetup.groups.get(gi.getGroup()).getQuota()+" req: "+gi.getNumPE());
             }
             if (max_free_cpu_res < 11 && i > 1000) {
-                //System.out.print("queue depth limit ");
+                //System.out.print("active_scheduling_queue depth limit ");
                 return null;
             }
 
         }
-        //System.out.print("whole queue (weird) ");
+        //System.out.print("whole active_scheduling_queue (weird) ");
         return null;
     }
 

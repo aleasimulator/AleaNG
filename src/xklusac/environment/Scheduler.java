@@ -5,6 +5,7 @@ import eduni.simjava.Sim_event;
 import gridsim.*;
 import java.io.IOException;
 import java.util.*;
+import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 import xklusac.objective_functions.CommonObjectives;
 import xklusac.extensions.*;
@@ -12,13 +13,13 @@ import xklusac.extensions.*;
 /**
  * Class Scheduler<p>
  * This class represents the Scheduler. It takes the GridletInfo object from
- * JobLoader and determines where to send the Gridlet. It uses both queue-based
- * (FCFS, EDF, Easy Backfilling, EDF-Backfilling and PBS-pro like algorithm) and
- * schedule-based (Backfill-like solution with Local search based optimization)
- * scheduling algorithms.<br> body() method is responsible for communication
- * while scheduling algorithms are placed outside this method. <br> Schedule of
- * each Resource is placed in objects of ResourceInfo class. One ResourceInfo
- * object represents one Resource.
+ * JobLoader and determines where to send the Gridlet. It uses both
+ * active_scheduling_queue-based (FCFS, EDF, Easy Backfilling, EDF-Backfilling
+ * and PBS-pro like algorithm) and schedule-based (Backfill-like solution with
+ * Local search based optimization) scheduling algorithms.<br> body() method is
+ * responsible for communication while scheduling algorithms are placed outside
+ * this method. <br> Schedule of each Resource is placed in objects of
+ * ResourceInfo class. One ResourceInfo object represents one Resource.
  *
  * @author Dalibor Klusacek
  */
@@ -67,9 +68,9 @@ public class Scheduler extends GridSim {
     private static LinkedList schedQueue = new LinkedList();
     public static LinkedList schedQueue2 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
-    public static LinkedList<GridletInfo> queue = new LinkedList();
+    public static LinkedList<GridletInfo> active_scheduling_queue = new LinkedList();
 
     public static LinkedList<GridletInfo> hold_queue = new LinkedList();
 
@@ -82,75 +83,75 @@ public class Scheduler extends GridSim {
 
     public static boolean schedule_too_long = false;
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q10 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q5 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q2 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q7 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q8 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q9 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q6 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q11 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q1 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q4 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList q3 = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList short_queue = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList normal_queue = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList quark_queue = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList long_queue = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList ncbr_queue = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList iti_queue = new LinkedList();
     /**
-     * incoming job queue
+     * incoming job active_scheduling_queue
      */
     public static LinkedList cpmd_queue = new LinkedList();
     /**
@@ -158,7 +159,7 @@ public class Scheduler extends GridSim {
      */
     public static LinkedList<LinkedList> all_queues = new LinkedList();
     /**
-     * denotes queue/schedule strategy
+     * denotes active_scheduling_queue/schedule strategy
      */
     public static int global_policy = 1;
     /**
@@ -166,7 +167,7 @@ public class Scheduler extends GridSim {
      */
     private int algorithm = 1;
     /**
-     * denotes queue/schedule size
+     * denotes active_scheduling_queue/schedule size
      */
     private int waiting_size = 0;
     /**
@@ -251,10 +252,6 @@ public class Scheduler extends GridSim {
      * auxiliary variable
      */
     int priority = 1;
-    /**
-     * auxiliary variable
-     */
-    int totalGridlet_ = 0;
     /**
      * auxiliary variable
      */
@@ -489,10 +486,6 @@ public class Scheduler extends GridSim {
     /**
      * auxiliary variable
      */
-    static boolean use_job_special_requests;
-    /**
-     * auxiliary variable
-     */
     int submitted = 0;
     /**
      * auxiliary variable
@@ -504,6 +497,7 @@ public class Scheduler extends GridSim {
     int event_opt = 0;
     int last_job_id = 0;
     public static long start_date = -1;
+    static TimeSeries series_system_usage;
 
     /**
      * auxiliary variable
@@ -519,8 +513,8 @@ public class Scheduler extends GridSim {
      * @param totalJSS number of JobLoaders communicating with this Scheduler
      * @param results results of this simulation that will be printed (in
      * ExperimentSetup class)
-     * @param algorithm selects queue/schedule based algorithm (FCFS, EDF,
-     * BackFilling, Tabu Search...)
+     * @param algorithm selects active_scheduling_queue/schedule based algorithm
+     * (FCFS, EDF, BackFilling, Tabu Search...)
      * @param data_set name of the data set file
      * @param total_gridlet number of gridlets to be executed
      * @param suff name of the scheduling algorithm
@@ -530,13 +524,13 @@ public class Scheduler extends GridSim {
      *
      */
     public Scheduler(String name, double baudRate, int totalJSS, LinkedList results, int algorithm, String data_set,
-            int total_gridlet, String suff, LinkedList windows, ResultCollector rc, int rnd) throws Exception {
+            String suff, LinkedList windows, ResultCollector rc, int rnd) throws Exception {
         super(name, baudRate);
 
         folder_prefix = System.getProperty("user.dir");
 
         this.failures = ExperimentSetup.failures;
-        this.use_job_special_requests = ExperimentSetup.reqs;
+
         this.windows = windows;
         if (windows.size() > 0) {
             visualize = true;
@@ -548,7 +542,6 @@ public class Scheduler extends GridSim {
         this.suff = suff;
         this.repeated = false;
 
-        this.totalGridlet_ = total_gridlet;
         this.current_gl = 0;
 
         date1 = new Date().getTime();
@@ -572,16 +565,18 @@ public class Scheduler extends GridSim {
         users_percentage_length.clear();
         users_jobs.clear();
         users_P_jobs.clear();
+        series_system_usage = new TimeSeries("System Usage %");
     }
 
     /**
      * The body() method communicates with other entities and directs the whole
      * Scheduler's behavior.<p>
      * This method receives the gridlets from JobLoader. When new gridlet arrive
-     * FCFS, EDF, BackFilling, etc. create the queue/schedule. When some
-     * gridlets are finished they are received. This is a signal for the
-     * scheduler to try to schedule waiting gridlets according to prepared
-     * queue/schedule (gridlet is finished = resource load has lowered).
+     * FCFS, EDF, BackFilling, etc. create the active_scheduling_queue/schedule.
+     * When some gridlets are finished they are received. This is a signal for
+     * the scheduler to try to schedule waiting gridlets according to prepared
+     * active_scheduling_queue/schedule (gridlet is finished = resource load has
+     * lowered).
      */
     public void body() {
 
@@ -687,21 +682,19 @@ public class Scheduler extends GridSim {
         // start the JobLoader
         super.sim_schedule(this.getEntityId(data_set + "_JobLoader"), 5.0, AleaSimTags.EVENT_WAKE);
 
-        // start periodic print of queue data
-        //super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.LOG_SCHEDULER);
         // periodic logging of current throughput (# of jobs completed so far)
         super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
         //super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_PRINT_SCHEDULE);
+
+        // fairshare algorithm
+        if (ExperimentSetup.use_fairshare) {
+            super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.FAIRSHARE_UPDATE);
+        }
 
         // periodic decrease of old fairshare weights
         if (ExperimentSetup.use_decay && ExperimentSetup.use_fairshare) {
             super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.FAIRSHARE_WEIGHT_DECAY);
         }
-        // periodic update of fairshare weights according to currently running jobs
-        //double fairdelay = 3600.0;
-        //System.out.println("Fairdelay: " + fairdelay);
-        //super.sim_schedule(this.getEntityId(this.getEntityName()), fairdelay, AleaSimTags.FAIRSHARE_UPDATE);
-        //super.sim_schedule(this.getEntityId(this.getEntityName()), fairdelay + 2, AleaSimTags.SCHEDULER_PRINT_FIRST_JOB_IN_QUEUE);
 
         // Accept events until the simulation is finished
         while (!end_of_submission || received < in_job_counter) {
@@ -728,13 +721,26 @@ public class Scheduler extends GridSim {
             }
 
             if (ev.get_tag() == AleaSimTags.SCHEDULER_PRINT_THROUGHPUT) {
-                //System.out.println("Now simtime = " + (Math.round(clock()/(3600*24))) + ", completed = " + received + " jobs. ");
-                resetTemporaryUsageAndUpdateFF();
-                this.updateFairShare();
-                ExperimentSetup.result_collector.recordSystemThroughput(clock(), ExperimentSetup.users); //received
-                ExperimentSetup.result_collector.recordFairshareFactor(clock(), ExperimentSetup.users);
-                ExperimentSetup.result_collector.recordUserUsage(clock(), ExperimentSetup.users);
-                super.sim_schedule(this.getEntityId(this.getEntityName()), (60), AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
+                if (Scheduler.start_date > -1) {
+                    if (!ExperimentSetup.use_fairshare) {
+                        ExperimentSetup.result_collector.recordUserUsage(clock(), ExperimentSetup.users);
+                    }
+                    ExperimentSetup.result_collector.recordClusterUsage(clock());
+
+                }
+                super.sim_schedule(this.getEntityId(this.getEntityName()), (ExperimentSetup.sample_tick), AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
+                continue;
+            }
+
+            if (ev.get_tag() == AleaSimTags.FAIRSHARE_UPDATE) {
+                if (Scheduler.start_date > -1) {
+                    resetTemporaryUsageAndUpdateFF();
+                    this.updateFairShare();
+                    //ExperimentSetup.result_collector.recordSystemThroughput(clock(), ExperimentSetup.users); //received
+                    //ExperimentSetup.result_collector.recordFairshareFactor(clock(), ExperimentSetup.users);
+                    ExperimentSetup.result_collector.recordUserUsage(clock(), ExperimentSetup.users);
+                }
+                super.sim_schedule(this.getEntityId(this.getEntityName()), ExperimentSetup.fairshare_update_interval, AleaSimTags.FAIRSHARE_UPDATE);
                 continue;
             }
 
@@ -751,25 +757,17 @@ public class Scheduler extends GridSim {
             }
 
             if (ev.get_tag() == AleaSimTags.FAIRSHARE_WEIGHT_DECAY && ExperimentSetup.use_fairshare) {
-                //System.out.println("Now waiting = " + getQueueSize() + ", simtime = " + Math.round(clock()) + ", running = " + getRunningJobs() + " jobs. Performing fairshare decay...");
                 applyDecay();
-                //decreaseFairShare();
                 super.sim_schedule(this.getEntityId(this.getEntityName()), (ExperimentSetup.decay_interval * 3600.0), AleaSimTags.FAIRSHARE_WEIGHT_DECAY);
-                continue;
-            }
-            if (ev.get_tag() == AleaSimTags.FAIRSHARE_UPDATE && ExperimentSetup.use_fairshare) {
-                //System.out.println("Now waiting = " + getQueueSize() + ", simtime = " + Math.round(clock()) + ", running = " + getRunningJobs() + " jobs. Performing fairshare update... ");
-                //updateFairShareOld();
-                super.sim_schedule(this.getEntityId(this.getEntityName()), (3600.0), AleaSimTags.FAIRSHARE_UPDATE);
                 continue;
             }
 
             if (ev.get_tag() == AleaSimTags.LOG_SCHEDULER) {
                 String idd = "";
-                if (queue.size() > 0) {
-                    idd += queue.getLast().getID();
+                if (active_scheduling_queue.size() > 0) {
+                    idd += active_scheduling_queue.getLast().getID();
                 }
-                //System.out.println(">>> " + in_job_counter + " so far arrived, in queue = " + getQueueSize() + " jobs, at time = " + Math.round(clock())+" running = "+getRunningJobs()+" FREE = "+getFreeCPUs()+" last jobID = "+idd);
+                //System.out.println(">>> " + in_job_counter + " so far arrived, in active_scheduling_queue = " + getQueueSize() + " jobs, at time = " + Math.round(clock())+" running = "+getRunningJobs()+" FREE = "+getFreeCPUs()+" last jobID = "+idd);
                 System.out.println(in_job_counter + " arrived, waiting = " + getScheduleSize() + " simtime = " + Math.round(clock()) + " running = " + getRunningJobs() + " FREE = " + getFreeCPUs() + " last jobID = " + last_job_id);
                 super.sim_schedule(this.getEntityId(this.getEntityName()), (3 * 3600.0), AleaSimTags.LOG_SCHEDULER);
                 continue;
@@ -866,7 +864,7 @@ public class Scheduler extends GridSim {
                 if (prev_scheduled == 0) {
                     scheduleGridlets();
                 }
-                
+
                 // periodic scheduling attempt (PBS verif only)
                 //super.sim_schedule(this.getEntityId(this.getEntityName()), (3600), AleaSimTags.EVENT_SCHEDULE);
                 continue;
@@ -891,6 +889,7 @@ public class Scheduler extends GridSim {
             // gridlet was finished. Get it, record results and do another scheduling run
             if (ev.get_tag() == GridSimTags.GRIDLET_RETURN) {
                 ComplexGridlet gridlet_received = (ComplexGridlet) ev.get_data();
+                //System.out.println("Gridlet: "+gridlet_received.getGridletID()+" returned to Scheduler, status: "+gridlet_received.getGridletStatusString()+" at time: "+GridSim.clock());
                 // remove job from schedule on resource
                 for (int j = 0; j < resourceInfoList.size(); j++) {
                     ResourceInfo ri = (ResourceInfo) resourceInfoList.get(j);
@@ -919,12 +918,12 @@ public class Scheduler extends GridSim {
                     }
                 }
 
-                // return jobs that were previously unable to run to the normal queue
+                // return jobs that were previously unable to run to the normal active_scheduling_queue
                 if (tried_queue.size() > 0) {
                     int return_counter = 0;
                     while (tried_queue.size() > 0 && return_counter < 100) {
                         GridletInfo gi = tried_queue.removeFirst();
-                        //System.out.println(gi.getID() + ": is returned to the normal queue.");
+                        //System.out.println(gi.getID() + ": is returned to the normal active_scheduling_queue.");
                         return_counter++;
                         ExperimentSetup.policy.addNewJob(gi);
                     }
@@ -935,7 +934,7 @@ public class Scheduler extends GridSim {
                 }
 
                 if (hold_queue.size() > 0 && ExperimentSetup.limit_schedule_size) {
-                    //System.out.println("hold queue, job end: "+GridSim.clock());
+                    //System.out.println("hold active_scheduling_queue, job end: "+GridSim.clock());
                     updateResourceInfos(clock(), "hold queue");
                     //(getScheduleSize() > ExperimentSetup.max_schedule_size || (classic_availPEs * ExperimentSetup.max_schedule_CPU_request_factor) < getScheduleCPUSize())
                     while (hold_queue.size() > 0 && ((classic_availPEs * ExperimentSetup.max_schedule_CPU_request_factor) > getScheduleCPUSize() && !schedule_too_long)) {
@@ -955,8 +954,30 @@ public class Scheduler extends GridSim {
                 //System.out.println(gridlet_received.getGridletID() + " finished at: " + GridSim.clock());
                 boolean optimize = false;
 
-                if (ExperimentSetup.use_queues) {
-                    ExperimentSetup.queues.get(gridlet_received.getQueue()).setUsed(ExperimentSetup.queues.get(gridlet_received.getQueue()).getUsed() - gridlet_received.getNumPE());
+                if (ExperimentSetup.use_multiple_queues && gridlet_received.getGridletStatus() != Gridlet.CANCELED) {
+                    ExperimentSetup.queues.get(gridlet_received.getQueue()).setQueue_used_CPUs(ExperimentSetup.queues.get(gridlet_received.getQueue()).getQueue_used_CPUs() - gridlet_received.getNumPE());
+                }
+
+                if (ExperimentSetup.use_user_groups && gridlet_received.getGridletStatus() != Gridlet.CANCELED) {
+                    ExperimentSetup.groups.get(gridlet_received.getGroupID()).setUsedQuota(ExperimentSetup.groups.get(gridlet_received.getGroupID()).getUsedQuota() - gridlet_received.getNumPE());
+                    ExperimentSetup.users.get(gridlet_received.getUser()).setUsed_quota(ExperimentSetup.users.get(gridlet_received.getUser()).getUsed_quota() - gridlet_received.getNumPE());
+                }
+
+                if (ExperimentSetup.use_user_groups && ExperimentSetup.groups.get(gridlet_received.getGroupID()).getFreeQuota() > 0 && ExperimentSetup.groups.get(gridlet_received.getGroupID()).getHeldJobsCount() > 0) {
+                    int limit = ExperimentSetup.groups.get(gridlet_received.getGroupID()).getFreeQuota();
+                    while (ExperimentSetup.groups.get(gridlet_received.getGroupID()).getHeldJobs().size() > 0 && limit > 0) {
+                        GridletInfo gr = ExperimentSetup.groups.get(gridlet_received.getGroupID()).getHeldJobs().removeFirst();
+                        ExperimentSetup.groups.get(gridlet_received.getGroupID()).setHeldJobsCount(ExperimentSetup.groups.get(gridlet_received.getGroupID()).getHeldJobsCount() - 1);
+                        hold_queue.remove(gr);
+                        //System.out.println("RETURN job "+gr.getID()+" group "+ExperimentSetup.groups.get(gridlet_received.getGroup()).getName()+" free= "+ExperimentSetup.groups.get(gridlet_received.getGroup()).getFreeQuota());
+                        limit = limit - gr.getNumPE();
+                        ExperimentSetup.policy.addNewJob(gr);
+
+                    }
+                    if (prev_scheduled == 0) {
+                        super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE);
+                        //scheduleGridlets();
+                    }
                 }
 
                 //rc.addFinishedJobToResults(gridlet_received, resourceInfoList);
@@ -1043,10 +1064,14 @@ public class Scheduler extends GridSim {
                 // update of user's resource consuption
                 updateLengthStatistics(gridlet_received, cpu_time);
 
-                //update fairshare factor
-                if (ExperimentSetup.use_fairshare || true) {
-                    User u = ExperimentSetup.users.get(gridlet_received.getUser());
-                    u.getRunning_jobs().remove(gridlet_received);
+                User u = ExperimentSetup.users.get(gridlet_received.getUser());
+                u.getRunning_jobs().remove(gridlet_received);
+                long job_wait = Math.round(Math.max(0.0, gridlet_received.getExecStartTime() - gridlet_received.getArrival_time()));
+                u.getWait_times().addLast(job_wait);
+                u.getArrival_wait_map().put(Math.round(gridlet_received.getArrival_time()), job_wait);
+
+                if (ExperimentSetup.use_fairshare) {
+                    //update fairshare factor
                     updateUsageAndFFafterCompletion(gridlet_received);
 
                 }
@@ -1130,7 +1155,7 @@ public class Scheduler extends GridSim {
                 // cancel all jobs that cannot be executed due to missing properties                
                 if (!isGridletExecutable(gi) || gi.getLength() < 0) {
                     bad++;
-                    System.out.println(Math.round(clock()) + " gridlet ID: " + gi.getID() + ": Error - unexecutable. Requirements: properties[" + gi.getProperties() + "], total CPUs=" + gi.getNumPE() + ", RAM=" + gi.getRam() + ", CPU per node=" + gi.getPpn() + ", #nodes=" + gi.getNumNodes());
+                    System.out.println("Job: " + gi.getID() + " is unexecutable (Error). Requirements: properties[" + gi.getProperties() + "], total CPUs=" + gi.getNumPE() + ", RAM=" + gi.getRam() + ", CPU per node=" + gi.getPpn() + ", #nodes=" + gi.getNumNodes());
                     try {
                         if (gl.getActualCPUTime() > 0.0) {
                             gl.setGridletStatus(Gridlet.FAILED_RESOURCE_UNAVAILABLE);
@@ -1140,7 +1165,7 @@ public class Scheduler extends GridSim {
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
-                    // due to failure some gridlets may not be executable anymore - therefore we have to cancel them
+                    // due to resource failure some gridlets may not be executable anymore - therefore we have to cancel them
                     // but MUST NOT increase the in_job_counter otherwise the simulation will not finish.
                     if (!gl.isRepeated()) {
                         in_job_counter++;
@@ -1184,7 +1209,7 @@ public class Scheduler extends GridSim {
                             add_to_DAG_queue = true;
                         }
                     }
-                    // add job to DAG queue of jobs waiting for completed predecessors
+                    // add job to DAG active_scheduling_queue of jobs waiting for completed predecessors
                     if (add_to_DAG_queue) {
                         System.out.println("[SCHEDULER] Job " + gi.getID() + " from " + gi.getGridlet().getArchRequired() + " added to DAG waiting queue -> waiting for completion of jobs: " + gi.getPrecedingJobs().toString());
                         DAG_queue.add(gi);
@@ -1202,23 +1227,23 @@ public class Scheduler extends GridSim {
                     } else {*/
                     //String dated = new java.text.SimpleDateFormat("dd-MM-yyyy-hh:mm:ss").format(new java.util.Date(Math.round(clock()) * 1000));
                     String dated = new java.text.SimpleDateFormat("dd-MM-yyyy [HH:mm]").format(new java.util.Date(Math.round(clock() + Scheduler.start_date) * 1000));
-                    //System.out.println(">>> " + in_job_counter + " so far arrived, in queue = " + getQueueSize() + " jobs, at time = " + Math.round(clock()) + " running = " + getRunningJobs() + " jobs, free CPUs = " + getFreeCPUs() + ", #" + queue.getFirst().getID() + " is the first waiting job in queue. Day: " + dated);
+                    //System.out.println(">>> " + in_job_counter + " so far arrived, in active_scheduling_queue = " + getQueueSize() + " jobs, at time = " + Math.round(clock()) + " running = " + getRunningJobs() + " jobs, free CPUs = " + getFreeCPUs() + ", #" + active_scheduling_queue.getFirst().getID() + " is the first waiting job in active_scheduling_queue. Day: " + dated);
                     System.out.println(">>> " + in_job_counter + " arrived, in queue/schedule " + getQueueSize() + " jobs, requiring " + getQueueCPUSize()
                             + " CPUs, held jobs " + hold_queue.size() + " running " + getRunningJobs()
                             + " jobs, free CPUs " + getFreeCPUs() + ", free RAM " + Math.round(getFreeRAM() / (1024.0 * 1024)) + " GB, free GPUs " + getFreeGPUs() + ", "
                             + "tried jobs " + tried_queue.size() + ", Day: " + dated + " SimClock: " + Math.round(clock()));
 
                 }
-                
+
                 User usr = ExperimentSetup.users.get(gi.getUser());
-                usr.setQueued_jobs(usr.getQueued_jobs()+1);
+                usr.setQueued_jobs(usr.getQueued_jobs() + 1);
 
                 // update total sched. generation time
                 Date d2 = new Date();
                 clock2 = d2.getTime();
                 clock += clock2 - clock1;
 
-                // try to schedule according to prepared queue/schedule
+                // try to schedule according to prepared active_scheduling_queue/schedule
                 //System.out.println(GridSim.clock() + ": Try Scheduling gridlets from schedule of size: " + getQueueSize() + " prev_scheduled = " + prev_scheduled);
                 if (prev_scheduled == 0) {
                     //System.out.println(GridSim.clock() + ": Scheduling gridlets from schedule of size: " + getQueueSize());
@@ -1232,11 +1257,10 @@ public class Scheduler extends GridSim {
 
         // all jobs were received
         if (end_of_submission && received == in_job_counter) {
-            ExperimentSetup.result_collector.recordSystemThroughput(clock(), ExperimentSetup.users);//started
-            ExperimentSetup.result_collector.recordFairshareFactor(clock(), ExperimentSetup.users);
+            //ExperimentSetup.result_collector.recordSystemThroughput(clock(), ExperimentSetup.users);//started
+            //ExperimentSetup.result_collector.recordFairshareFactor(clock(), ExperimentSetup.users);
             ExperimentSetup.result_collector.recordUserUsage(clock(), ExperimentSetup.users);
-            // final update of FairShare
-            //updateFairShareOld();
+
             // turn off the JobLoader
             super.send(this.getEntityId(data_set + "_JobLoader"), GridSimTags.SCHEDULE_NOW, GridSimTags.END_OF_SIMULATION, 0.0);
             // turn off the FailureLoader
@@ -1269,12 +1293,12 @@ public class Scheduler extends GridSim {
 
     /**
      * Starts scheduling according to the applied algorithm and prepared
-     * schedule/queue
+     * schedule/active_scheduling_queue
      */
     private boolean scheduleGridlets() {
         Date d = new Date();
         clock1 = d.getTime();
-        // try to schedule according to prepared queue/schedule
+        // try to schedule according to prepared active_scheduling_queue/schedule
         /*System.out.println(GridSim.clock() + " OK, scheduling from following schedule:");
         for (int i = 0; i < resourceInfoList.size(); i++) {
             ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
@@ -1548,6 +1572,30 @@ public class Scheduler extends GridSim {
         ResourceInfo ri = null;
         boolean executable = false;
 
+        if (ExperimentSetup.use_multiple_queues) {
+            int queue_limit = ExperimentSetup.queues.get(gi.getQueue()).getQueue_CPU_limit();
+            if (queue_limit < gi.getNumPE()) {
+                System.out.println(gi.getID() + " is unexecutable: Queue limit FAIL. Queue Limit=" + queue_limit + " < requested=" + gi.getNumPE());
+                return false;
+            }
+        }
+
+        if (ExperimentSetup.use_user_groups) {
+            FairshareGroup g = ExperimentSetup.groups.get(gi.getGroupID());
+            User u = ExperimentSetup.users.get(gi.getUser());
+            int group_limit = g.getQuota();
+            int user_limit = u.getUserQuota();
+            if (group_limit < gi.getNumPE()) {
+                System.out.println(gi.getID() + " is unexecutable: Group Quota limit FAIL. Group Quota limit=" + group_limit + " < requested=" + gi.getNumPE() + " for group " + g.getName());
+                return false;
+            } else if (user_limit < gi.getNumPE()) {
+                System.out.println(gi.getID() + " is unexecutable: User Quota limit FAIL. User Quota limit=" + user_limit + " < requested=" + gi.getNumPE() + " for user " + u.getName());
+                return false;
+            } else {
+                //System.out.println(gi.getID()+": Quota group_limit OK. Quota group_limit="+group_limit+" >= requested="+gi.getNumPE()+" for group "+g.getName());
+            }
+        }
+
         for (int i = 0; i < resourceInfoList.size(); i++) {
             ri = (ResourceInfo) resourceInfoList.get(i);
             if (ri.canExecuteEver(gi)) {
@@ -1559,7 +1607,7 @@ public class Scheduler extends GridSim {
             } else {
                 HashMap h = gi.getResourceSuitable();
                 h.put(ri.resource.getResourceID(), false);
-                //System.out.println(gi.getID() + ": cannot run on:" + ri.resource.getResourceName() + " CPU=" + isSuitable(ri, gi) + " RAM=" + (gi.getRam() <= ri.getRamOfOneMachine()) + " req: ppn=" + gi.getPpn() + " nodes=" + gi.getNumNodes() + " RAM=" + gi.getRam() + " suit=" + isSuitable(ri, gi)+" req="+gi.getProperties()+" use_reqs="+use_job_special_requests);
+                //System.out.println(gi.getID() + ": cannot run on:" + ri.resource.getResourceName() + " CPU=" + isSuitable(ri, gi) + " RAM=" + (gi.getRam() <= ri.getRamOfOneMachine()) + " req: ppn=" + gi.getPpn() + " nodes=" + gi.getNumNodes() + " RAM=" + gi.getRam() + " suit=" + isSuitable(ri, gi)+" req="+gi.getProperties()+" use_reqs="+use_specific_job_requirements);
             }
         }
         return executable;
@@ -1567,7 +1615,7 @@ public class Scheduler extends GridSim {
     }
 
     /**
-     * Returns the number of waiting jobs in queue(s)
+     * Returns the number of waiting jobs in active_scheduling_queue(s)
      */
     private int getQueueSize() {
         int size = 0;
@@ -1678,6 +1726,7 @@ public class Scheduler extends GridSim {
         users_percentage_length.add(user_index, tot_perc);
 
         User u = ExperimentSetup.users.get(gridlet_received.getUser());
+        // record how much of the user-specified walltime was actually used
         u.addPercentage(Math.max(1.0, gridlet_received.getEstimatedLength() / gridlet_received.getGridletLength()));
 
         //updateFairShareOld();
@@ -1711,13 +1760,14 @@ public class Scheduler extends GridSim {
             users_percentage_length.addLast(0.0);
 
             // store user into a map of all users.
-            User u = new User(gi.getUser());
-            //System.out.println("Adding user "+gi.getUser());
-            ExperimentSetup.users.put(gi.getUser(), u);
+            if (!ExperimentSetup.users.containsKey(gi.getUser())) {
+                User u = new User(gi.getUser(), "user_" + gi.getUser());
+                System.out.println("Adding user " + gi.getUser());
+                ExperimentSetup.users.put(gi.getUser(), u);
+            }
 
         }
         User u = ExperimentSetup.users.get(gi.getUser());
-        //u.setQueued_jobs(u.getQueued_jobs() + 1);
         // set FairShare priority of this job
         updateFairshareFactorPriority(gi);
 
@@ -1878,7 +1928,7 @@ public class Scheduler extends GridSim {
             if (time > u.getLast_temp_timestamp() + (1)) { //20*60 - 20 minutes originaly, (1): pbs verif strict 
                 u.setTemporary_usage(0);
                 u.setLast_temp_timestamp(time);
-            }else{
+            } else {
                 //System.out.println("Same timestamp:"+time+" = "+u.getLast_temp_timestamp());
             }
             updateUserFairshareFactor(u);
@@ -1926,35 +1976,72 @@ public class Scheduler extends GridSim {
     }
 
     public void drawCharts() {
+        if (ExperimentSetup.draw_chart == false) {
+            return;
+        }
         TimeSeriesCollection dataset_ff = new TimeSeriesCollection();
         TimeSeriesCollection dataset_usage = new TimeSeriesCollection();
         TimeSeriesCollection dataset_cumul_usage = new TimeSeriesCollection();
+        TimeSeriesCollection dataset_waiting_jobs = new TimeSeriesCollection();
 
         Object[] keys = ExperimentSetup.users.keySet().toArray();
         for (int u = 0; u < ExperimentSetup.users.size(); u++) {
+            // use this hack to keep them always ordered
             User us = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(u));
+            //User us = ExperimentSetup.users.get((String)keys[u]);
             dataset_usage.addSeries(us.series_u);
+            dataset_waiting_jobs.addSeries(us.series_w);
             dataset_ff.addSeries(us.series_ff);
             dataset_cumul_usage.addSeries(us.series_c_u);
         }
 
-        int width = 500;
-        int height = 300;
+        TimeSeriesCollection dataset_cluster_usage = new TimeSeriesCollection();
+        TimeSeriesCollection dataset_cluster_used = new TimeSeriesCollection();
+        TimeSeriesCollection dataset_system_usage = new TimeSeriesCollection();
+        dataset_system_usage.addSeries(series_system_usage);
 
-        if (ExperimentSetup.use_decay) {
-            TimeSeriesChart example = new TimeSeriesChart("Fairshare Factor", Scheduler.scheduling_algorithm + " - Decay applied", dataset_ff, true, width, height);
-        } else {
-            TimeSeriesChart example = new TimeSeriesChart("Fairshare Factor", Scheduler.scheduling_algorithm + " - No Decaying applied", dataset_ff, true, width, height);
-        }
-        //TimeSeriesChart exampleu = new TimeSeriesChart(prefix + "Usage in time", "", dataset_usage, false, width, height);
-
-        if (ExperimentSetup.use_decay) {
-
-            TimeSeriesChart examplecu = new TimeSeriesChart("Cumulative Usage", Scheduler.scheduling_algorithm + " - Decay applied", dataset_cumul_usage, false, width, height);
-        } else {
-            TimeSeriesChart examplecu = new TimeSeriesChart("Cumulative Usage", Scheduler.scheduling_algorithm + " - No Decaying applied", dataset_cumul_usage, false, width, height);
+        for (int i = 0; i < resourceInfoList.size(); i++) {
+            ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
+            dataset_cluster_usage.addSeries(ri.series_usage);
+            dataset_cluster_used.addSeries(ri.series_used);
         }
 
+        int width = ExperimentSetup.chart_width;
+        int height = ExperimentSetup.chart_height;
+
+        String yaxis = "used quota (# of CPUs)";
+        if (ExperimentSetup.allocate_whole_nodes) {
+            yaxis = "used quota (# of nodes)";
+        }
+
+        TimeSeriesChart user_usage = new TimeSeriesChart("User Used Quota (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_usage, false, width, height, yaxis, 0);
+        TimeSeriesChart user_waiting = new TimeSeriesChart("User Waiting Jobs (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_waiting_jobs, false, width, height, "waiting jobs", 1);
+        TimeSeriesChart cluster_usage = new TimeSeriesChart("Cluster Usage % (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_cluster_usage, false, width, height, "CPU usage (%)", 2);
+        TimeSeriesAreaChart system_usage = new TimeSeriesAreaChart("Overal System Usage % (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_system_usage, false, width, height, "CPU usage (%)", 3);
+        ScatterChart wait_scatter = new ScatterChart("Wait times (minutes) wrt. arrivals", Scheduler.scheduling_algorithm, false, width, height, "wait time (m)", "arrival time (s)", 4);
+        BoxPlotChart wait_boxplot = new BoxPlotChart("Distr. of wait time (minutes) wrt. users ", Scheduler.scheduling_algorithm, "users", "wait time (minutes)", width, height, 4);
+
+        yaxis = "# of used CPUs";
+        if (ExperimentSetup.allocate_whole_nodes) {
+            yaxis = "# of used nodes";
+        }
+        if (ExperimentSetup.basic_charts == false) {
+            TimeSeriesChart cluster_used = new TimeSeriesChart("Cluster Used CPUs (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_cluster_used, false, width, height, yaxis, 4);
+            if (ExperimentSetup.use_fairshare) {
+                if (ExperimentSetup.use_decay) {
+                    TimeSeriesChart example = new TimeSeriesChart("User Fairshare Factor", Scheduler.scheduling_algorithm + " - Decay applied", dataset_ff, true, width, height, "Fairshare Factor", 5);
+                } else {
+                    TimeSeriesChart example = new TimeSeriesChart("User Fairshare Factor", Scheduler.scheduling_algorithm + " - No Decaying applied", dataset_ff, true, width, height, "Fairshare Factor", 5);
+                }
+
+                if (ExperimentSetup.use_decay) {
+
+                    TimeSeriesChart examplecu = new TimeSeriesChart("User Cumulative Usage", Scheduler.scheduling_algorithm + " - Decay applied", dataset_cumul_usage, false, width, height, "usage (CPU hours)", 6);
+                } else {
+                    TimeSeriesChart examplecu = new TimeSeriesChart("User Cumulative Usage", Scheduler.scheduling_algorithm + " - No Decaying applied", dataset_cumul_usage, false, width, height, "usage (CPU hours)", 6);
+                }
+            }
+        }
     }
 
     /**
@@ -1986,7 +2073,7 @@ public class Scheduler extends GridSim {
         }
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
             LinkedList curr_queue = Scheduler.all_queues.get(q);
-            //System.out.println(q+" Current queue has "+curr_queue.size());
+            //System.out.println(q+" Current active_scheduling_queue has "+curr_queue.size());
             for (int i = 0; i < curr_queue.size(); i++) {
                 GridletInfo gi = (GridletInfo) curr_queue.get(i);
                 //System.out.print(gi.getID()+" has priortity = "+gi.getPriority());
@@ -2008,8 +2095,8 @@ public class Scheduler extends GridSim {
     }
 
     /**
-     * Removes job from a temporary queue - used during rescheduling after
-     * machine restart or machine failure.
+     * Removes job from a temporary active_scheduling_queue - used during
+     * rescheduling after machine restart or machine failure.
      */
     private boolean removeGridletInfo(GridletInfo gi) {
         for (int j = 0; j < job_queue.size(); j++) {
@@ -2113,9 +2200,14 @@ public class Scheduler extends GridSim {
      * This method submits job to a specified resource
      */
     public void submitJob(ComplexGridlet gl, int resID) {
-        if (ExperimentSetup.use_queues) {
-            ExperimentSetup.queues.get(gl.getQueue()).setUsed(ExperimentSetup.queues.get(gl.getQueue()).getUsed() + gl.getNumPE());
+        if (ExperimentSetup.use_multiple_queues) {
+            ExperimentSetup.queues.get(gl.getQueue()).setQueue_used_CPUs(ExperimentSetup.queues.get(gl.getQueue()).getQueue_used_CPUs() + gl.getNumPE());
         }
+        if (ExperimentSetup.use_user_groups) {
+            ExperimentSetup.groups.get(gl.getGroupID()).setUsedQuota(ExperimentSetup.groups.get(gl.getGroupID()).getUsedQuota() + gl.getNumPE());
+            ExperimentSetup.users.get(gl.getUser()).setUsed_quota(ExperimentSetup.users.get(gl.getUser()).getUsed_quota() + gl.getNumPE());
+        }
+
         gridletSubmit(gl, resID);
         started++;
         User u = ExperimentSetup.users.get(gl.getUser());
@@ -2241,7 +2333,7 @@ public class Scheduler extends GridSim {
         day_usage += CommonObjectives.getActualUsage();
         week_usage += CommonObjectives.getActualUsage();
 
-        // write out queue length (not to be used for schedule-based algorithms)
+        // write out active_scheduling_queue length (not to be used for schedule-based algorithms)
         if (algorithm < 10) {
             try {
                 out.writeString(folder_prefix + "/waiting_" + suff + ".csv", day_count + "\t" + getQueueSize());
@@ -2250,7 +2342,7 @@ public class Scheduler extends GridSim {
             }
 
         } else {
-            // write out schedule size (do not use for queue-based algorithms)
+            // write out schedule size (do not use for active_scheduling_queue-based algorithms)
             try {
                 out.writeString(folder_prefix + "/waiting_" + suff + ".csv", day_count + "\t" + getScheduleSize());
             } catch (IOException ex) {

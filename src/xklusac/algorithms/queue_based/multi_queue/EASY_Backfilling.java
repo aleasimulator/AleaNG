@@ -64,9 +64,9 @@ public class EASY_Backfilling implements SchedulingPolicy {
         }
 
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
-            Scheduler.queue = Scheduler.all_queues.get(q);
-            if (Scheduler.queue.size() > 0) {
-                GridletInfo gi = (GridletInfo) Scheduler.queue.getFirst();
+            Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
+            if (Scheduler.active_scheduling_queue.size() > 0) {
+                GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.getFirst();
 
                 for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                     ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
@@ -80,7 +80,7 @@ public class EASY_Backfilling implements SchedulingPolicy {
                 }
 
                 if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.removeFirst();
+                    gi = (GridletInfo) Scheduler.active_scheduling_queue.removeFirst();
                     r_cand.addGInfoInExec(gi);
                     // set the resource ID for this gridletInfo (this is the final scheduling decision)
                     gi.setResourceID(r_cand.resource.getResourceID());
@@ -94,12 +94,12 @@ public class EASY_Backfilling implements SchedulingPolicy {
                 }
             }
             // try backfilling procedure
-            if (!succ && Scheduler.queue.size() > 1) {
+            if (!succ && Scheduler.active_scheduling_queue.size() > 1) {
                 boolean removed = false;
                 // do not create reservation for job that cannot be executed
-                for (int j = 0; j < Scheduler.queue.size(); j++) {
+                for (int j = 0; j < Scheduler.active_scheduling_queue.size(); j++) {
 
-                    GridletInfo gi = (GridletInfo) Scheduler.queue.get(j);
+                    GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(j);
                     if (gi.isExecutable()) {
                         break;
                     } else {
@@ -112,16 +112,16 @@ public class EASY_Backfilling implements SchedulingPolicy {
                         }
                         removed = true;
                         scheduler.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, GridSimTags.GRIDLET_RETURN, gi.getGridlet());
-                        Scheduler.queue.remove(j);
+                        Scheduler.active_scheduling_queue.remove(j);
                         j--;
                     }
                 }
                 // EASY will be called again when killed jobs return to Scheduler - no waiting will happen.
                 if (removed) {
                     return 0;
-                    // head of queue - gridlet with reservation
+                    // head of active_scheduling_queue - gridlet with reservation
                 }
-                GridletInfo grsv = (GridletInfo) Scheduler.queue.get(0);
+                GridletInfo grsv = (GridletInfo) Scheduler.active_scheduling_queue.get(0);
                 // reserved machine (i.e. Earliest Available)
 
                 ResourceInfo rsv_res = findReservedResource(grsv);
@@ -134,9 +134,9 @@ public class EASY_Backfilling implements SchedulingPolicy {
                 }
                 
 
-                // try backfilling on all gridlets in queue except for head (grsv)
-                for (int j = 1; j < Scheduler.queue.size(); j++) {
-                    GridletInfo gi = (GridletInfo) Scheduler.queue.get(j);
+                // try backfilling on all gridlets in active_scheduling_queue except for head (grsv)
+                for (int j = 1; j < Scheduler.active_scheduling_queue.size(); j++) {
+                    GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(j);
                     int req = gi.getNumPE();
                     /*if (gi.getNumPE() >= grsv.getNumPE()) {
                      continue; // such gridlet will never succeed (not true if requirements used)
@@ -151,7 +151,7 @@ public class EASY_Backfilling implements SchedulingPolicy {
                     ResourceInfo ri = findResourceBF(gi, grsv, rsv_res, eligible_resources);
 
                     if (ri != null) {
-                        Scheduler.queue.remove(j);
+                        Scheduler.active_scheduling_queue.remove(j);
                         ri.addGInfoInExec(gi);
                         // set the resource ID for this gridletInfo (this is the final scheduling decision)
                         gi.setResourceID(ri.resource.getResourceID());
@@ -169,7 +169,7 @@ public class EASY_Backfilling implements SchedulingPolicy {
                         //scheduler.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.GRIDLET_SENT, gi);
 
                         scheduled++;
-                        j--; //to get correct gridlet from queue in next round. The queue was shortened...
+                        j--; //to get correct gridlet from active_scheduling_queue in next round. The active_scheduling_queue was shortened...
                         return 1;
 
                     }
@@ -177,8 +177,8 @@ public class EASY_Backfilling implements SchedulingPolicy {
                 eligible_resources = null;
             }
 
-            //if(scheduled>0)System.out.println(queue.size()+" remain, backfilled = "+scheduled);
-        }//next queue
+            //if(scheduled>0)System.out.println(active_scheduling_queue.size()+" remain, backfilled = "+scheduled);
+        }//next active_scheduling_queue
         /*if (min_prop.equals("1:ppn=1:mem=409600KB:vmem=137438953472KB:scratch_type=any:scratch_volume=1024mb:x86:nfs4:debian7")) {
          System.out.println("EASY scheduled " + scheduled + " gridlets, minimal requirement was " + min_CPUs_req + " CPUs with properties = (" + min_prop + "), while total available is: " + currently_free_CPUs + " CPUs, max per cluster = " + max_per_cluster);
          currently_free_CPUs = 0;

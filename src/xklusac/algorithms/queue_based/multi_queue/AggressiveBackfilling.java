@@ -16,8 +16,8 @@ import xklusac.environment.Scheduler;
 
 /**
  * Class AggressiveBackfilling<p>
- * This class implements multi-queue priority-based fair share using scheduling
- * policy, similar to the algorithm applied in Czech NGI MetaCentrum.
+ This class implements multi-active_scheduling_queue priority-based fair share using scheduling
+ policy, similar to the algorithm applied in Czech NGI MetaCentrum.
  *
  * @author Dalibor Klusacek
  */
@@ -68,13 +68,13 @@ public class AggressiveBackfilling implements SchedulingPolicy {
             return 0;
         }
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
-            Scheduler.queue = Scheduler.all_queues.get(q);
+            Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
 
-            // we go through the whole queue
+            // we go through the whole active_scheduling_queue
             int min_cannot_run = 50000;
-            for (int i = 0; i < Scheduler.queue.size(); i++) {
+            for (int i = 0; i < Scheduler.active_scheduling_queue.size(); i++) {
 
-                GridletInfo gi = (GridletInfo) Scheduler.queue.get(i);
+                GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(i);
                 if (gi.getNumPE() >= min_cannot_run || gi.getNumPE() > max_free_CPUs) {
                     //System.out.println(gi.getID()+" req more than previous failed job.. skiping");
                     continue;
@@ -88,7 +88,7 @@ public class AggressiveBackfilling implements SchedulingPolicy {
                     }
                 }
                 if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.remove(i);
+                    gi = (GridletInfo) Scheduler.active_scheduling_queue.remove(i);
                     r_cand.addGInfoInExec(gi);
                     // set the resource ID for this gridletInfo (this is the final scheduling decision)
                     gi.setResourceID(r_cand.resource.getResourceID());
@@ -111,8 +111,8 @@ public class AggressiveBackfilling implements SchedulingPolicy {
                     }
                 }
 
-            }//we went through the whole queue
-        }//next queue
+            }//we went through the whole active_scheduling_queue
+        }//next active_scheduling_queue
         eligible_resources = null;
         return scheduled;
 

@@ -47,9 +47,9 @@ public class FCFS implements SchedulingPolicy {
         int scheduled = 0;
         ResourceInfo r_cand = null;
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
-            Scheduler.queue = Scheduler.all_queues.get(q);
-            for (int i = 0; i < Scheduler.queue.size(); i++) {
-                GridletInfo gi = (GridletInfo) Scheduler.queue.get(i);
+            Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
+            for (int i = 0; i < Scheduler.active_scheduling_queue.size(); i++) {
+                GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(i);
                 for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                     ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
 
@@ -59,7 +59,7 @@ public class FCFS implements SchedulingPolicy {
                     }
                 }
                 if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.remove(i);
+                    gi = (GridletInfo) Scheduler.active_scheduling_queue.remove(i);
                     //System.err.println(gi.getID()+" PEs size = "+gi.PEs.size());
                     //scheduler.logJobSubmit(gi.getGridlet(), r_cand.resource.getResourceID());
                     r_cand.addGInfoInExec(gi);

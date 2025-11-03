@@ -15,9 +15,9 @@ import xklusac.environment.Scheduler;
 import xklusac.extensions.WallclockComparator;
 
 /**
- * Class PBS_PRO<p> This class implements multi-queue priority-based fair share
- * using scheduling policy, similar to the algorithm applied in Czech NGI
- * MetaCentrum.
+ * Class PBS_PRO<p> This class implements multi-active_scheduling_queue priority-based fair share
+ using scheduling policy, similar to the algorithm applied in Czech NGI
+ MetaCentrum.
  *
  * @author Dalibor Klusacek
  */
@@ -48,7 +48,7 @@ public class PBS_PRO implements SchedulingPolicy {
         double runtime1 = new Date().getTime();
         //System.out.println("New job has been received by PBS PRO");
         if (Scheduler.data_set.equals("metacentrum.mwf") || Scheduler.data_set.equals("metacentrumE.mwf")) {
-            //System.out.println("queue by PBS PRO...");
+            //System.out.println("active_scheduling_queue by PBS PRO...");
             if (gi.getQueue().equals("q1")) {
                 Scheduler.q1.addLast(gi);
                 Scheduler.runtime += (new Date().getTime() - runtime1);
@@ -153,9 +153,9 @@ public class PBS_PRO implements SchedulingPolicy {
     /**
      * PBS-pro like algorithm. It is setted up according to the situation used
      * in Czech Grid infrastructure "MetaCentrum".<p> For sharcnet, the setup
-     * would be different. Therefore, we do not suggest that you use it as it is
-     * but rather take it as a inspiration how multi-queue system with
-     * priorities may be implemented.
+ would be different. Therefore, we do not suggest that you use it as it is
+ but rather take it as a inspiration how multi-active_scheduling_queue system with
+ priorities may be implemented.
      */
     @Override
     public int selectJob() {
@@ -176,11 +176,11 @@ public class PBS_PRO implements SchedulingPolicy {
             }
              */
 
-            Scheduler.queue = Scheduler.all_queues.get(q);
-            Collections.sort(Scheduler.queue, new WallclockComparator());
-            for (int i = 0; i < Scheduler.queue.size(); i++) {
+            Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
+            Collections.sort(Scheduler.active_scheduling_queue, new WallclockComparator());
+            for (int i = 0; i < Scheduler.active_scheduling_queue.size(); i++) {
                 
-                GridletInfo gi = (GridletInfo) Scheduler.queue.get(i);
+                GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(i);
                 
                 for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                     ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
@@ -190,7 +190,7 @@ public class PBS_PRO implements SchedulingPolicy {
                     }
                 }
                 if (r_cand != null) {
-                    gi = (GridletInfo) Scheduler.queue.remove(i);
+                    gi = (GridletInfo) Scheduler.active_scheduling_queue.remove(i);
                     /*
                      * if(i>0 && gi.getPriority() > ((GridletInfo)
                      * curr_queue.get(0)).getPriority()){
@@ -216,7 +216,7 @@ public class PBS_PRO implements SchedulingPolicy {
 
                 }
 
-            }//we went through the whole queue
+            }//we went through the whole active_scheduling_queue
 
         }// we went through all queues
 

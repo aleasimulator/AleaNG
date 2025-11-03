@@ -126,7 +126,7 @@ public class AleaSimTags {
      * periodic collection of scheduling data - used for visualization
      */
     public static final int SCHEDULER_COLLECT = TAG_BASE + 602;
-    
+
     /**
      * print info on waiting jobs
      */
@@ -147,19 +147,24 @@ public class AleaSimTags {
      * On Job Completion notification tag.
      */
     public static final int AGENT_ONJOBCOMPL = TAG_BASE + 205;
-    
+
     public static final int AGENT_ONJOBFAIL = TAG_BASE + 206;
-    
+
     /**
      * log info about jobs completed so far
      */
     public static final int SCHEDULER_PRINT_THROUGHPUT = TAG_BASE + 1981;
-    
+
     /**
      * print info about job schedule
      */
     public static final int SCHEDULER_PRINT_SCHEDULE = TAG_BASE + 1982;
-    
-    
-    
+
+    /**
+     * Tag for checkpoint-preemption event
+     * <p>
+     * Event sent by resource info class, proccessed by AllocationPolicy.
+     */
+    public static final int POLICY_CHECKPOINT = TAG_BASE + 1983;
+
 }

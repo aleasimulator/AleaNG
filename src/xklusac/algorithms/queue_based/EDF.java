@@ -30,8 +30,8 @@ public class EDF implements SchedulingPolicy {
     @Override
     public void addNewJob(GridletInfo gi) {
         double runtime1 = new Date().getTime();
-        Scheduler.queue.addLast(gi);
-        Collections.sort(Scheduler.queue, new DeadlineComparator());
+        Scheduler.active_scheduling_queue.addLast(gi);
+        Collections.sort(Scheduler.active_scheduling_queue, new DeadlineComparator());
         //System.out.println(GridSim.clock()+": FCFS job received");
         Scheduler.runtime += (new Date().getTime() - runtime1);
         //System.out.println("New job has been received by EDF");
@@ -42,8 +42,8 @@ public class EDF implements SchedulingPolicy {
         //System.out.println("Selecting job by EDF...");
         int scheduled = 0;
         ResourceInfo r_cand = null;
-        for (int i = 0; i < Scheduler.queue.size(); i++) {
-            GridletInfo gi = (GridletInfo) Scheduler.queue.get(i);
+        for (int i = 0; i < Scheduler.active_scheduling_queue.size(); i++) {
+            GridletInfo gi = (GridletInfo) Scheduler.active_scheduling_queue.get(i);
             for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                 ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
 
@@ -54,7 +54,7 @@ public class EDF implements SchedulingPolicy {
                 }
             }
             if (r_cand != null) {
-                gi = (GridletInfo) Scheduler.queue.remove(i);
+                gi = (GridletInfo) Scheduler.active_scheduling_queue.remove(i);
                 //System.err.println(gi.getID()+" PEs size = "+gi.PEs.size());
                 r_cand.addGInfoInExec(gi);
                 // set the resource ID for this gridletInfo (this is the final scheduling decision)

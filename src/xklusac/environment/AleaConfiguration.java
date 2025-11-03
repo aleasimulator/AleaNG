@@ -235,6 +235,7 @@ public class AleaConfiguration {
     }
 
     private static String[] extractStringArray(String value) {
+        value = value.replaceAll(" ", "");
         String[] s = value.split(",");
         return s;
     }
@@ -284,7 +285,7 @@ public class AleaConfiguration {
         String line;
         while ((line = br.readLine()) != null) {
             line = line.trim();
-            if (!line.startsWith("#")) {
+            if (!line.startsWith("#") && line.length()>1) {
                 int index = line.indexOf("=");
                 String key = line.substring(0, index);
                 keys.add(key);

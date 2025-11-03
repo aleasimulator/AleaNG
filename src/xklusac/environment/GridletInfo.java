@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import static xklusac.environment.ExperimentSetup.predictor_increase;
 import xklusac.extensions.ProcessorComparator;
 //import gridsim.*;
 
@@ -137,9 +136,12 @@ public class GridletInfo {
     private ArrayList<Integer> precedingJobs = null;
 
     private HashMap<Integer, Boolean> resourceSuitable;
-    
+
     private boolean executable;
     private int gpus_per_node = 0;
+    private int groupID = 0;
+    private boolean checkpoint_limit_eligible = true;
+    private boolean preempted = true;
 
     /**
      * Creates a new instance of GridletInfo object based on the "real" gridlet
@@ -185,7 +187,10 @@ public class GridletInfo {
         this.setPrecedingJobs(gl.getPrecedingJobs());
         this.setExecutable(false);
         this.setGpus_per_node(gl.getGpus_per_node());
-        
+        this.setGroupID(gl.getGroupID());
+        this.setCheckpoint_limit_eligible(true);
+        this.setPreempted(gl.isPreempted());
+
     }
 
     /**
@@ -592,11 +597,12 @@ public class GridletInfo {
         if (ExperimentSetup.estimates) {
             if (ExperimentSetup.use_PercentageLength) {
                 ExperimentSetup.scheduler.updateGridletWalltimeEstimateApproximation(this);
-
                 return Math.min(jobLimit, Math.max(0.0, (this.getAvg_perc_length() / peRating)));
-                // estimate is calculated using 5 recent jobs of that user - for each a relative usage (percentage) of requested time is calculated. 
-                // Then, the max usage among those 5 jobs is used as a factor to multiply the new user estimate (conservative strategy).    
+
             } else if (ExperimentSetup.use_MaxPercentageLength) {
+                // estimate is calculated using 5 recent jobs of that user - for each a relative usage (percentage) of requested time is calculated. 
+                // Then, the max usage among those 5 jobs is used as a factor to multiply the new user estimate (conservative strategy).
+
                 // if the estimate is known - do not change it except for making it longer
                 if (this.getGridlet().getPredicted_runtime() > 0 && this.getGridlet().getExecStartTime() > 0.0) {
                     // job is underestimated so prolong
@@ -621,13 +627,11 @@ public class GridletInfo {
                     }
                 } else {
                     User u = ExperimentSetup.users.get(this.getUser());
+                    // we check previous 5 jobs and choose the one most using the walltime using this "percentage" value (not a real percentage). 
+                    // Then we apply this ratio on this new job walltime limit and call it the expected runtime. 
                     double avg_perc = u.getMinPercentage();
                     double avg_l = (this.getEstimatedLength() / avg_perc) * ExperimentSetup.predictor_increase;
-                    double run = Math.min(jobLimit, Math.max(0.0, (this.getLength() / peRating)));
-                    double est = Math.min(jobLimit, Math.max(0.0, (avg_l / peRating)));
                     this.getGridlet().setPredicted_runtime(Math.round(Math.min(jobLimit, Math.max(0.0, (avg_l / peRating)))));
-                    //if(this.getID()==94704)
-                    //            System.out.println(this.getID()+" is updated waiting, new est: "+(Math.round(this.getGridlet().getPredicted_runtime())));
                     // if the first prediction is underestimated - record the difference
                     if (this.getGridlet().getUnderestimated_by() < 1.0) {
                         double real_run = Math.min(jobLimit, Math.max(0.0, (this.getLength() / peRating)));
@@ -643,6 +647,7 @@ public class GridletInfo {
                 return Math.round(Math.min(jobLimit, this.getGridlet().getPredicted_runtime()));
 
             } else if (ExperimentSetup.use_AvgLength) {
+                // estimate = average runtime of previous jobs
                 ExperimentSetup.scheduler.updateGridletWalltimeEstimateApproximation(this);
                 //System.out.println("avg length ===== "+Math.round(this.getAvg_length() / peRating)+" ? "+Math.round(this.getLast_length() / peRating));
                 return Math.min(jobLimit, Math.max(0.0, (this.getAvg_length() / peRating)));
@@ -650,63 +655,12 @@ public class GridletInfo {
                 ExperimentSetup.scheduler.updateGridletWalltimeEstimateApproximation(this);
                 //System.out.println(this.getID()+" last length = "+Math.min(jobLimit, Math.max(0.0, (this.getLast_length() / peRating)))+" / job limit = "+jobLimit+" user = "+this.getUser());
                 return Math.min(jobLimit, Math.max(0.0, ((this.getLast_length() / peRating))));
-            }/* else if (ExperimentSetup.useUserPrecision) {
-             //System.out.println("last length ===== "+jobLimit);
-             double real_runtime = Math.max(0.0, (this.getLength() / peRating));
-             double diff = (jobLimit - real_runtime) / 100.0;
-             diff = diff * this.getPercentage();
-             //System.out.println(this.getID()+": limit = "+jobLimit+", estimate increased by "+this.getPercentage()+"% from "+Math.round(real_runtime)+" to "+Math.round(real_runtime+diff)+" which is "+Math.round(((Math.round(real_runtime+diff)*100)/real_runtime))+"% of real runtime");
-             // return real runtime + additional time as "added" bu user estimate
-             return Math.min(jobLimit, Math.max(0.0, (real_runtime + diff)));
-             } else if (ExperimentSetup.useDurationPrecision) {
-             //System.out.println("last length ===== "+jobLimit);
-             double real_runtime = Math.max(0.0, (this.getLength() / peRating));
-             double diff = (real_runtime) / 100.0;
-             diff = diff * this.getPercentage();
-             //System.out.println(this.getID()+": D_limit = "+jobLimit+", estimate (in/de)creased by "+this.getPercentage()+"% from "+Math.round(real_runtime)+" to "+Math.round(real_runtime+diff)+" which is "+Math.round(((Math.round(real_runtime+diff)*100)/real_runtime))+"% of real runtime");
-             //System.out.println(this.getID()+": D_limit = "+jobLimit+", real runtime in/de creased by "+this.getPercentage()+" % from "+Math.round(real_runtime)+" to "+Math.round(real_runtime+diff)+" which is "+((Math.round(real_runtime+diff))/real_runtime));
-             // return real runtime + additional time as "added" bu user estimate
-
-
-             return Math.min(jobLimit, Math.max(0.0, (real_runtime + diff)));
-             }*/ else {
-
-                double REAL_RUNTIME = Math.max(0.0, (this.getLength() / peRating));
-                double RUNTIME = jobLimit;
-                /*if (RUNTIME == 86400) {
-                 //6 8 12 16 20
-                 if (REAL_RUNTIME < (5 * 3600)) {
-                 RUNTIME = 5 * 3600;
-                 } else if (REAL_RUNTIME < (6 * 3600)) {
-                 RUNTIME = 6 * 3600;
-                 } else if (REAL_RUNTIME < (8 * 3600)) {
-                 RUNTIME = 8 * 3600;
-                 } else if (REAL_RUNTIME < (12 * 3600)) {
-                 RUNTIME = 12 * 3600;
-                 } else if (REAL_RUNTIME < (16 * 3600)) {
-                 RUNTIME = 16 * 3600;
-                 } else if (REAL_RUNTIME < (20 * 3600)) {
-                 RUNTIME = 20 * 3600;
-                 }
-                 }
-                 if (RUNTIME == 14400) {
-                 //6 8 12 16 20
-                 if (REAL_RUNTIME < (3 * 3600)) {
-                 RUNTIME = 3 * 3600;
-                 }
-                 }*/
-
-                return RUNTIME;
-                //System.out.println("job limit length ===== "+jobLimit);
-                //return jobLimit;
+            } else {
+                // return original runtime estimate                
+                return jobLimit;
             }
         } else {
-            /*
-             * if(jobLimit < Math.max(0.0, (this.getLength() / peRating)) &&
-             * ExperimentSetup.use_tsafrir){ System.out.println(this.getID()+"
-             * limit < runtime by "+Math.round(Math.max(0.0, (this.getLength() /
-             * peRating))-jobLimit)+" seconds."); }
-             */
+            // return real (exact) runtime
             return Math.min(jobLimit, Math.max(0.0, (this.getLength() / peRating)));
         }
 
@@ -916,6 +870,48 @@ public class GridletInfo {
      */
     public void setGpus_per_node(int gpus_per_node) {
         this.gpus_per_node = gpus_per_node;
+    }
+
+    /**
+     * @return the groupID
+     */
+    public int getGroupID() {
+        return groupID;
+    }
+
+    /**
+     * @param groupID the groupID to set
+     */
+    public void setGroupID(int groupID) {
+        this.groupID = groupID;
+    }
+
+    /**
+     * @return the checkpoint_limit_eligible
+     */
+    public boolean isCheckpoint_limit_eligible() {
+        return checkpoint_limit_eligible;
+    }
+
+    /**
+     * @param checkpoint_limit_eligible the checkpoint_limit_eligible to set
+     */
+    public void setCheckpoint_limit_eligible(boolean checkpoint_limit_eligible) {
+        this.checkpoint_limit_eligible = checkpoint_limit_eligible;
+    }
+
+    /**
+     * @return the preempted
+     */
+    public boolean isPreempted() {
+        return preempted;
+    }
+
+    /**
+     * @param preempted the preempted to set
+     */
+    public void setPreempted(boolean preempted) {
+        this.preempted = preempted;
     }
 
 }

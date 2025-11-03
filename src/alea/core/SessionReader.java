@@ -44,7 +44,7 @@ public class SessionReader {
     BufferedReader br = null;
 
     public SessionReader(String name) {
-        br = r.openFile(new File(ExperimentSetup.data_sets + "/" + name));
+        br = r.openFile(new File(ExperimentSetup.data_sets_dir + "/" + name));
     }
 
     /** 

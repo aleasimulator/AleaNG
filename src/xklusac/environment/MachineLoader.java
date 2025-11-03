@@ -16,7 +16,8 @@ import java.util.LinkedList;
 import xklusac.extensions.Input;
 
 /**
- * Class MachineLoader<p> Creates GridResources according to specified data set.
+ * Class MachineLoader<p>
+ * Creates GridResources according to specified data set.
  *
  * @author Dalibor Klusacek
  */
@@ -31,12 +32,14 @@ public class MachineLoader {
      * Creates a new instance of MachineLoader
      */
     public MachineLoader(double bandwidth, double cost, String data_set) {
+        System.out.println("--------------------------------------");
         System.out.println("Starting Machine Loader ...");
         this.bandwidth = bandwidth;
         this.cost = cost;
         this.data_set = data_set;
         this.total_CPUs = 0;
         init(data_set);
+        System.out.println("--------------------------------------");
     }
 
     /**
@@ -49,7 +52,7 @@ public class MachineLoader {
             createGridResources(bandwidth, cost, set);
         } else if (set.contains(".swf")) {
             createGridResources(bandwidth, cost, set);
-        }  else if (set.contains(".dyn")) {
+        } else if (set.contains(".dyn")) {
             createGridResources(bandwidth, cost, set);
         } else {
             System.out.println("Wrong machine workload format or file extension (gwf.machines, swf.machines, dyn.machines)");
@@ -66,9 +69,9 @@ public class MachineLoader {
         Input r = new Input();
 
         BufferedReader br = null;
-
-        br = r.openFile(new File(ExperimentSetup.data_sets + "/" + data_set + ".machines"));
-        System.out.println("Opening: " + ExperimentSetup.data_sets + "/" + data_set + ".machines");
+        String adresar = System.getProperty("user.dir");
+        br = r.openFile(new File(adresar + ExperimentSetup.data_sets_dir + data_set + ".machines"));
+        System.out.println("Opening: " + adresar + ExperimentSetup.data_sets_dir + data_set + ".machines");
         r.getLines(lines, br);
         r.closeFile(br);
         int name_id = 0;
@@ -80,7 +83,10 @@ public class MachineLoader {
         // create resources and machines from file
         for (int j = 0; j < lines.size(); j++) {
 
-            String[] values = ((String) lines.get(j)).split("\t");
+            String[] values = ((String) lines.get(j)).split("\\s+");
+            if (values[0].contains(";")) {
+                continue;
+            }
             //System.out.println(lines.get(j));
             int id = Integer.parseInt(values[0]);
             int gpus_per_node = Integer.parseInt(values[7]);
@@ -89,21 +95,27 @@ public class MachineLoader {
                 //ram in KB or GB
                 ram = Long.parseLong(values[5]);
                 // small value indicates that the RAM was stored in GB rather than SWF's KB
-                if(ram<1024*10){
+                if (ram < 1024 * 10) {
                     ram = ram * 1024 * 1024;
                 }
             }
             int totalMachine = Integer.parseInt(values[2]);
             int totalPE = Integer.parseInt(values[3]);
+
+            if (ExperimentSetup.allocate_whole_nodes) {
+                totalPE = 1;
+            }
             int peRating = Integer.parseInt(values[4]);
             String name = values[1];
-            String description = "";
+            String description;
             if (values.length > 6) {
                 //partition
                 description = values[6];
-            }else{
+            } else {
                 description = values[0];
             }
+
+            System.out.println("Creating cluster " + name + " with " + totalMachine + " nodes. Each node has " + totalPE + " CPUs and " + gpus_per_node + " GPUs.");
 
             // for JobLoader's purposes
             max = totalPE * totalMachine;
@@ -119,7 +131,6 @@ public class MachineLoader {
                 ExperimentSetup.maxPErating = peRating;
             }
 
-
             //    A Machine contains one or more PEs or CPUs. Therefore, should
             //    create an object of PEList to store these PEs before creating
             //    a Machine.
@@ -134,15 +145,12 @@ public class MachineLoader {
 
                 mList.add(new MachineWithRAMandGPUs(m, peList, ram, gpus_per_node));
 
-
             }
-
 
             //    Create a ResourceCharacteristics object that stores the
             //    properties of a Grid resource: architecture, OS, list of
             //    Machines allocation policy: time- or space-shared, time zone
             //    and its price (G$/PE time unit).
-
             // to-do: read this from file. These values are sharcnet specific
             String arch = "Pentium 4";      // system architecture e.g. Xeon, Opteron, Pentium3
 
@@ -157,9 +165,6 @@ public class MachineLoader {
 
             ComplexResourceCharacteristics resConfig = new ComplexResourceCharacteristics(
                     arch, os, mList, ResourceCharacteristics.SPACE_SHARED, time_zone, cost, ram, properties, cpu_ids);
-
-
-
 
             // Finally, we need to create a ComplexGridResource object.
             long seed = 11L * 13 * 17 * 19 * 23 + 1;
@@ -204,7 +209,7 @@ public class MachineLoader {
                 ComplexGridResource gridRes = new ComplexGridResource(name, bandwidth, resConfig,
                         resCalendar, apolicy);
 
-                    ExperimentSetup.avail_CPUs += gridRes.resource_.getNumPE();
+                ExperimentSetup.avail_CPUs += gridRes.resource_.getNumPE();
 
                 MachineList machines = gridRes.resource_.getMachineList();
                 for (int i = 0; i < machines.size(); i++) {
@@ -213,15 +218,12 @@ public class MachineLoader {
 
                 }
 
-
             } catch (Exception e) {
                 System.out.println("Error in creating GridResource.");
                 System.out.println(e.getMessage());
             }
 
-
         }
     }
 
-    
 }

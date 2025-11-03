@@ -27,6 +27,7 @@ import java.util.TimeZone;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jfree.data.time.Minute;
+import static xklusac.environment.Scheduler.resourceInfoList;
 
 /**
  * Class ResultCollector<p>
@@ -36,8 +37,6 @@ import org.jfree.data.time.Minute;
  */
 public class ResultCollector {
 
-    String run = "";
-    double runavg = 0.0;
     int tot = 0;
     public LinkedList results;
     public String data_set;
@@ -50,24 +49,12 @@ public class ResultCollector {
     PrintWriter pwt = null;
     PrintWriter pwf = null;
     PrintWriter pwu = null;
-    double TSA = 0.0;
-    double SAJ = 0.0;
-    double SDJ = 0.0;
-    double SSDJ = 0.0;
-    int succ_m = 0;
-    int bad = 0;
     double job_time = 0.0;
     double avail_time = 0.0;
     //static double failure_time = 0.0;
     double wjob_time = 0.0;
     double wavail_time = 0.0;
     //static double wfailure_time = 0.0;
-    double av_PEs = 0.0;
-    double wav_PEs = 0.0;
-    double day_usage = 0.0;
-    double week_usage = 0.0;
-    int week_count = 0;
-    //double run_time = 0.0;
     /**
      * denotes total flow time
      */
@@ -122,6 +109,7 @@ public class ResultCollector {
      */
     private int received = 0;
     private String user_dir = "";
+    private boolean print_user_usage_header = true;
 
     private List<Plugin> plugins = new ArrayList<Plugin>();
 
@@ -289,7 +277,7 @@ public class ResultCollector {
         // print results (deadline score and scheduling time and makespan)
         //System.out.println("DataSet: " + data_set);
         System.out.println("-----------------------------------------------------------------------------------------------------------");
-        System.out.println(" ResultCollector - generates results for " + (Math.round(submitted * 100.0) / (experiment_count * 100.0)) + " submitted jobs.");
+        System.out.println(" ResultCollector - Submitted " + (Math.round(submitted * 100.0) / (experiment_count * 100.0)) + " jobs. Collected " + completed_jobs + " jobs (may be higher due to Chckp/Restart)");
         //String fair = "user\ttuwt[i]\tnuwt[i]\ttusa[i]\tnwt";
         String fair = "";
 
@@ -314,38 +302,65 @@ public class ResultCollector {
         try {
             // delete old one, will be left at the end
             if (ExperimentSetup.algID != ExperimentSetup.prevAlgID) {
-                out.deleteResults(user_dir + "/Users" + prob + ".csv");
+                out.deleteResults(user_dir + "/users" + prob + ".csv");
             }
 
-            out.writeString(user_dir + "/Users" + prob + ".csv", fair.replace(".", ","));
-            out.writeString(user_dir + "/Results(" + problem + ").csv", (suff + "\t"
-                    + Math.round(submitted * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(completed_jobs * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(neg_score * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(flow_time * 100) / (experiment_count * 100.0) + "\t"
-                    + Math.round(avg_time * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(creation_time * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(avg_makespan) / (experiment_count) + "\t"
-                    + Math.round(machine_usage * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(classic_usage * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(tardiness * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(wait_time * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(slowdown * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(awrt * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(awsd * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(succ_flow * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(succ_wait * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(succ_slow * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(b_succ_slow * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(backfilled * 100.0) / (experiment_count * 100.0) + "\t"
-                    + Math.round(backfilled_cons * 100.0) / (experiment_count * 100.0)
-                    + pluginResultString).replace(".", ","));
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeString(user_dir + "/users" + prob + ".csv", fair);
+                out.writeString(user_dir + "/Results(" + problem + ").csv", (suff + "\t"
+                        + Math.round(submitted * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(completed_jobs * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(neg_score * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(flow_time * 100) / (experiment_count * 100.0) + "\t"
+                        + Math.round(avg_time * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(creation_time * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(avg_makespan) / (experiment_count) + "\t"
+                        + Math.round(machine_usage * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(classic_usage * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(tardiness * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(wait_time * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(slowdown * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(awrt * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(awsd * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(succ_flow * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(succ_wait * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(succ_slow * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(b_succ_slow * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(backfilled * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(backfilled_cons * 100.0) / (experiment_count * 100.0)
+                        + pluginResultString));
+            } else {
 
-            run = run + " , " + Math.round(avg_time * 100.0) / (experiment_count * 100.0);
+                out.writeString(user_dir + "/users" + prob + ".csv", fair.replace(".", ","));
+                out.writeString(user_dir + "/Results(" + problem + ").csv", (suff + "\t"
+                        + Math.round(submitted * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(completed_jobs * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(neg_score * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(flow_time * 100) / (experiment_count * 100.0) + "\t"
+                        + Math.round(avg_time * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(creation_time * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(avg_makespan) / (experiment_count) + "\t"
+                        + Math.round(machine_usage * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(classic_usage * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(tardiness * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(wait_time * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(slowdown * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(awrt * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(awsd * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(succ_flow * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(succ_wait * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(succ_slow * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(b_succ_slow * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(backfilled * 100.0) / (experiment_count * 100.0) + "\t"
+                        + Math.round(backfilled_cons * 100.0) / (experiment_count * 100.0)
+                        + pluginResultString).replace(".", ","));
+            }
+
+            /*run = run + " , " + Math.round(avg_time * 100.0) / (experiment_count * 100.0);
             runavg += Math.round(avg_time * 100.0) / (experiment_count * 100.0);
             System.out.println("runtime [s]: " + Math.round(avg_time * 100.0) / (experiment_count * 100.0));
             System.out.println("runtimes [s]: " + run + " | avg = " + Math.round(runavg * 10.0) / 50.0);
-
+             */
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -398,7 +413,7 @@ public class ResultCollector {
             } else {
                 prob += "_stradani";
             }
-            this.output_name = user_dir + "/jobs" + prob + ".csv";
+            this.output_name = user_dir + "/completed_jobs" + prob + ".csv";
             out.deleteResults(output_name);
 
             this.pw = new PrintWriter(new FileWriter(FileUtil.getPath(output_name)), true);
@@ -408,11 +423,13 @@ public class ResultCollector {
             this.pwc = new PrintWriter(new FileWriter(FileUtil.getPath(user_dir + "/complain(" + problem + "" + ExperimentSetup.algID + ").csv"), true));
             this.pwt = new PrintWriter(new FileWriter(FileUtil.getPath(user_dir + "/throughput(" + problem + "" + ExperimentSetup.algID + ").csv"), true));
             this.pwf = new PrintWriter(new FileWriter(FileUtil.getPath(user_dir + "/FF(" + problem + "" + ExperimentSetup.algID + ").csv"), true));
-            this.pwu = new PrintWriter(new FileWriter(FileUtil.getPath(user_dir + "/Usage(" + problem + "" + ExperimentSetup.algID + ").csv"), true));
+            this.pwu = new PrintWriter(new FileWriter(FileUtil.getPath(user_dir + "/user_usage_in_time(" + problem + "" + ExperimentSetup.algID + ").csv"), true));
 
-            out.writeStringWriter(pw, "job_ID \t DAG_ID \t arrival \t wait \t start_time \t runtime \t end_time \t CPUs \t RAM(KB) \t userID \t queue \t walltime_limit \t initial_exp._wait \t "
-                    + "predicted_walltime \t last_valid_time_prediction \t time_valid_for \t last_valid_node_prediction \t node_valid_for "
-                    + "\t backfilled \t cons_backf \t err_user \t err_predict \t abs_err_predict \t under_est_by(s) \t prolonged");
+            //out.writeStringWriter(pw, ("job_ID \t STATUS \t arrival \t wait \t start_time \t runtime \t end_time \t CPUs \t RAM(KB) \t userID \t user_name \t queue \t real_runtime \t walltime_limit \t initial_exp._wait \t "
+            //        + "predicted_walltime \t last_valid_time_prediction \t time_valid_for \t last_valid_node_prediction \t node_valid_for "
+            //        + "\t backfilled \t cons_backf \t err_user \t err_predict \t abs_err_predict \t under_est_by(s) \t prolonged").replace(" ",""));
+            out.writeStringWriter(pw, ("job_ID \t STATUS \t arrival \t wait \t start_time \t runtime \t end_time \t CPUs \t RAM(KB) \t userID \t user_name"
+                    + " \t queue \t real_runtime \t walltime_limit \t backfilled").replace(" ", ""));
 
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -435,7 +452,7 @@ public class ResultCollector {
             cpu_time = Math.max(1.0, gi.getGridlet().getActualCPUTime());
             mips = gridlet_received.getGridletFinishedSoFar();
             arrival = gi.getGridlet().getArrival_time();
-            System.out.println(gi.getID() + " returned failed, time = " + GridSim.clock());
+            System.out.println("Job: " + gi.getID() + " scheduled but returned failed from resource, time = " + GridSim.clock());
 
         } else if (gridlet_received.getGridletStatus() == Gridlet.CANCELED) {
             failed++;
@@ -443,11 +460,11 @@ public class ResultCollector {
             cpu_time = 0.0;
             arrival = gi.getGridlet().getArrival_time();
             mips = 0.0;
-            System.out.println(gi.getID() + " returned canceled, time = " + GridSim.clock());
+            System.out.println("Job: " + gi.getID() + " returned canceled (unexecutable), time = " + GridSim.clock());
 
         } else {
             success++;
-            finish_time = gi.getGridlet().getFinishTime();
+            finish_time = Math.max(gi.getGridlet().getFinishTime(), GridSim.clock());
             cpu_time = gi.getGridlet().getActualCPUTime();
             arrival = gi.getGridlet().getArrival_time();
             mips = gridlet_received.getGridletLength();
@@ -497,8 +514,8 @@ public class ResultCollector {
 
         // write out jobs 
         try {
-            // giID - wait - runtime - userID - numPE - ram - arrival - queue
-            out.writeStringWriterErr(pw2, gridlet_received.getGridletID() + "\t" + Math.max(0.0, (response - cpu_time))
+            // giID - wait - runtime - userID - numPE - ram - arrival - active_scheduling_queue
+            out.writeStringToFile(pw2, gridlet_received.getGridletID() + "\t" + Math.max(0.0, (response - cpu_time))
                     + "\t" + cpu_time + "\t" + gi.getUser() + "\t" + gi.getNumPE() + "\t" + gi.getRam() + "\t" + gi.getRelease_date() + "\t" + gi.getQueue()
                     + "\t" + gridlet_received.getPredicted_wait() + "\t" + gridlet_received.getPredicted_runtime());
             String prob = "_";
@@ -516,19 +533,41 @@ public class ResultCollector {
                 prob += "_stradani";
             }
 
-            String line = gridlet_received.getGridletID() + "\t" + gridlet_received.getArchRequired() + "\t" + Math.round(gi.getRelease_date()) + "\t"
+            String status = gridlet_received.getGridletStatusString();
+            if (status.equals("Success") && gridlet_received.isPreempted()) {
+                if (ExperimentSetup.use_preemption && ExperimentSetup.requeue && ExperimentSetup.use_checkpoint) {
+                    status = "Success-after-Resume";
+                }
+                if (ExperimentSetup.use_preemption && ExperimentSetup.requeue && !ExperimentSetup.use_checkpoint) {
+                    status = "Success-after-Restart";
+                }
+            }
+            if (status.equals("Paused") && ExperimentSetup.use_preemption && !ExperimentSetup.requeue) {
+                status = "Killed-no-Requeue";
+            }
+            if (status.equals("Paused") && ExperimentSetup.use_preemption && ExperimentSetup.requeue && ExperimentSetup.use_checkpoint) {
+                status = "Checkpoint-to-Resume";
+            }
+            if (status.equals("Paused") && ExperimentSetup.use_preemption && ExperimentSetup.requeue && !ExperimentSetup.use_checkpoint) {
+                status = "Killed-to-Restart";
+            }
+            String line = gridlet_received.getGridletID() + "\t" + status + "\t" + Math.round(gi.getRelease_date()) + "\t"
                     + Math.round(Math.max(0.0, (response - cpu_time)) * 10) / 10.0
                     + "\t" + Math.round(gridlet_received.getExecStartTime() * 10) / 10.0 + "\t" + Math.round(cpu_time * 10) / 10.0 + "\t" + Math.round(gridlet_received.getFinishTime() * 10) / 10.0 + "\t"
-                    + gi.getNumPE() + "\t" + gi.getRam() + "\t" + gi.getUser() + "\t" + gi.getQueue() + "\t" + gi.getJobLimit()
-                    + "\t" + gridlet_received.getPredicted_wait() + "\t" + gridlet_received.getPredicted_runtime() + "\t"
-                    + gridlet_received.getLast_alloc_time() + "\t" + Math.round((gridlet_received.getExecStartTime() - gridlet_received.getLast_alloc_time()) * 100) / 100.0 + "\t"
-                    + gridlet_received.getLast_node_time() + "\t" + Math.round((gridlet_received.getExecStartTime() - gridlet_received.getLast_node_time()) * 100) / 100.0
-                    + "\t" + gridlet_received.isBackfilled() + "\t" + gridlet_received.isCons_backfilled()
-                    + "\t" + Math.round((gi.getJobLimit() - cpu_time) * 10) / 10.0 + "\t" + Math.round((gridlet_received.getPredicted_runtime() - cpu_time) * 10) / 10.0
-                    + "\t" + Math.abs(Math.round((gridlet_received.getPredicted_runtime() - cpu_time) * 10) / 10.0) + "\t" + gridlet_received.getUnderestimated_by() + "\t" + gridlet_received.getProlonged();
+                    + gi.getNumPE() + "\t" + gi.getRam() + "\t" + gi.getUser() + "\t" + ExperimentSetup.users.get(gi.getUser()).getLogin() + "\t" + gi.getQueue() + "\t" + gi.getLength() + "\t" + gi.getJobLimit()
+                    //+ "\t" + gridlet_received.getPredicted_wait() + "\t" + gridlet_received.getPredicted_runtime() + "\t"
+                    //+ gridlet_received.getLast_alloc_time() + "\t" + Math.round((gridlet_received.getExecStartTime() - gridlet_received.getLast_alloc_time()) * 100) / 100.0 + "\t"
+                    //+ gridlet_received.getLast_node_time() + "\t" + Math.round((gridlet_received.getExecStartTime() - gridlet_received.getLast_node_time()) * 100) / 100.0
+                    + "\t" + gridlet_received.isBackfilled(); //+ "\t" + gridlet_received.isCons_backfilled()
+            //+ "\t" + Math.round((gi.getJobLimit() - cpu_time) * 10) / 10.0 + "\t" + Math.round((gridlet_received.getPredicted_runtime() - cpu_time) * 10) / 10.0
+            //+ "\t" + Math.abs(Math.round((gridlet_received.getPredicted_runtime() - cpu_time) * 10) / 10.0) + "\t" + gridlet_received.getUnderestimated_by() + "\t" + gridlet_received.getProlonged();
 
             //out.writeStringWriter(user_dir + "/jobs" + prob + ".csv", line.replace(".", ","));
-            out.writeStringWriter(pw, line.replace(".", ","));
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeStringWriter(pw, line);
+            } else {
+                out.writeStringWriter(pw, line.replace(".", ","));
+            }
 
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -635,7 +674,11 @@ public class ResultCollector {
         }
 
         ExperimentSetup.users.clear();
+        ExperimentSetup.user_logins.clear();
         ExperimentSetup.queues.clear();
+        ExperimentSetup.queues_id_to_name_mapping.clear();
+        ExperimentSetup.backfilled = 0;
+        ExperimentSetup.backfilled_cons = 0;
         System.out.println("Finished reseting internal values...");
     }
 
@@ -812,13 +855,15 @@ public class ResultCollector {
         int totj = 0;
 
         // calculate the sum of powers of average normalized wt - normalized user wt
-        line += "user_id\ttuwt\tnuwt\ttusa\tjob_count\tavg_user_wait\tturam\tavg_user_ram\tavg_user_sq_area\n";
+        line += "user_id\tlogin\ttuwt\tnuwt\ttusa\tjob_count\tavg_user_wait\tturam\tavg_user_ram\tavg_user_sq_area\n";
         for (int i = 0; i < Scheduler.users.size(); i++) {
+            String u = Scheduler.users.get(i);
+            String login = ExperimentSetup.users.get(u).getLogin();
             // to avoid decreasement of values when the power is computed we add 1.0 
             if (i < Scheduler.users.size() - 1) {
-                line += Scheduler.users.get(i) + "\t" + tuwt[i] + "\t" + nuwt[i] + "\t" + tusa[i] + "\t" + tujobs[i] + "\t" + Math.round((tuwt[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + turam[i] + "\t" + Math.round((turam[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + Math.round((tusa[i] * 100.0) / tujobs[i]) / 100.0 + "\n";
+                line += Scheduler.users.get(i) + "\t" + login + "\t" + tuwt[i] + "\t" + nuwt[i] + "\t" + tusa[i] + "\t" + tujobs[i] + "\t" + Math.round((tuwt[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + turam[i] + "\t" + Math.round((turam[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + Math.round((tusa[i] * 100.0) / tujobs[i]) / 100.0 + "\n";
             } else {
-                line += Scheduler.users.get(i) + "\t" + tuwt[i] + "\t" + nuwt[i] + "\t" + tusa[i] + "\t" + tujobs[i] + "\t" + Math.round((tuwt[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + turam[i] + "\t" + Math.round((turam[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + Math.round((tusa[i] * 100.0) / tujobs[i]) / 100.0 + "";
+                line += Scheduler.users.get(i) + "\t" + login + "\t" + tuwt[i] + "\t" + nuwt[i] + "\t" + tusa[i] + "\t" + tujobs[i] + "\t" + Math.round((tuwt[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + turam[i] + "\t" + Math.round((turam[i] * 100.0) / tujobs[i]) / 100.0 + "\t" + Math.round((tusa[i] * 100.0) / tujobs[i]) / 100.0 + "";
             }
             totj += tujobs[i];
             //System.out.println("user"+i+" nuwt="+(Math.round(nuwt[i]*100.0))/100.0+" tusa="+Math.round(tusa[i]));            
@@ -841,7 +886,11 @@ public class ResultCollector {
             factor = Math.round(factor * 1000) / 1000.0;
             String output = gid + "\t" + Math.round(time) + "\t" + userID + "\t" + user + "\t" + factor + "\t" + job_count;
             // giID - time - userID - user - factor - job count
-            out.writeStringWriterErr(pwc, output.replace(".", ","));
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeStringToFile(pwc, output);
+            } else {
+                out.writeStringToFile(pwc, output.replace(".", ","));
+            }
 
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -852,7 +901,12 @@ public class ResultCollector {
         try {
             String th = Math.round(time / (1)) + "\t" + job_count;
             // time - finished job count
-            out.writeStringWriterErr(pwt, th.replace(".", ","));
+
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeStringToFile(pwt, th);
+            } else {
+                out.writeStringToFile(pwt, th.replace(".", ","));
+            }
 
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -867,8 +921,11 @@ public class ResultCollector {
                 User u = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(i));
                 th += u.getStarted_jobs() + "\t";
             }
-
-            out.writeStringWriterErr(pwt, th.replace(".", ","));
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeStringToFile(pwt, th);
+            } else {
+                out.writeStringToFile(pwt, th.replace(".", ","));
+            }
 
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -882,7 +939,12 @@ public class ResultCollector {
                 User u = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(i));
                 th += Math.round(u.getFairshare_factor() * 10000) / 10000.0 + "\t";
             }
-            out.writeStringWriterErr(pwf, th.replace(".", ","));
+            //out.writeStringToFile(pwf, th.replace(".", ","));
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeStringToFile(pwf, th);
+            } else {
+                out.writeStringToFile(pwf, th.replace(".", ","));
+            }
             //System.out.println("FF: " + th);
 
         } catch (IOException ex) {
@@ -893,27 +955,59 @@ public class ResultCollector {
     public void recordUserUsage(double time, Hashtable<String, User> users) {
         try {
             String th = Math.round(time / (1)) + "\t";
-            String un = "";
+            String header = "time\t";
 
             for (int i = 0; i < ExperimentSetup.users.size(); i++) {
                 User u = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(i));
-                //un += u.getName()+"x";
-                
+                if (print_user_usage_header) {
+                    header += u.getLogin() + "\t";
+                }
+
                 th += Math.round((u.getCumul_usage() + u.getRunningUsage()) / 3.60) / 1000.0 + "\t";  // CPU secs -> CPU hours
 
                 //System.out.println(u.getName()+" running usage+cumul="+Math.round(u.getRunningUsage())+" + "+Math.round(u.getCumul_usage()));
                 Date date = new java.util.Date(Math.round(GridSim.clock() + Scheduler.start_date) * 1000);
-                u.series_u.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
-                u.series_ff.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round(u.getFairshare_factor() * 10000) / 10000.0);
-                u.series_c_u.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
 
+                //u.series_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getLastTickUsage()) / 36.0) / 100.0);
+                u.series_u.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round(u.getUsed_quota()));
+                u.series_w.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round(u.getQueued_jobs()));
+                //System.out.println(u.getLogin()+": usage "+u.getLastTickUsage()+" time ="+date.toString());
+                if (ExperimentSetup.use_fairshare) {
+                    u.series_ff.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round(u.getFairshare_factor() * 10000) / 10000.0);
+                    u.series_c_u.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
+                }
             }
-            th += un;
-            //System.out.println("Usage: " + th + " total="+Math.round(Scheduler.calculate_total_usage() / 3.60) / 1000.0);
-            out.writeStringWriterErr(pwu, th.replace(".", ","));
+            if (print_user_usage_header) {
+                th = header + "\n" + th;
+            }
+            print_user_usage_header = false;
+
+            if (ExperimentSetup.use_EN_decimal) {
+                out.writeStringToFile(pwu, th);
+            } else {
+                out.writeStringToFile(pwu, th.replace(".", ","));
+            }
 
         } catch (IOException ex) {
             ex.printStackTrace();
         }
+    }
+
+    public void recordClusterUsage(double time) {
+        int busy = 0;
+        int running = 0;
+        Date date = new java.util.Date(Math.round(GridSim.clock() + Scheduler.start_date) * 1000);
+        for (int i = 0; i < resourceInfoList.size(); i++) {
+            ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
+            int b = ri.getNumBusyPE();
+            int r = ri.getNumRunningPE();
+            busy += b;
+            running += r;
+            //u.series_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
+            ri.series_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((b / (r / 100.0)) * 100) / 100.0);
+            ri.series_used.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), b);
+
+        }
+        Scheduler.series_system_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((busy / (running / 100.0)) * 100) / 100.0);
     }
 }

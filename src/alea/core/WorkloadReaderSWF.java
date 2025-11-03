@@ -83,8 +83,8 @@ public class WorkloadReaderSWF {
         this.norm = new Sim_normal_obj("normal distr", 0.0, 5.0, (121 + ExperimentSetup.rnd_seed));
         this.data_set = data_set;
 
-        String input_path = ExperimentSetup.data_sets + "/" + data_set;
-        System.out.println(ExperimentSetup.data_sets + "/" + data_set);
+        String input_path = ExperimentSetup.data_sets_dir + "/" + data_set;
+        System.out.println(ExperimentSetup.data_sets_dir + "/" + data_set);
         br = r.openFile(new File(input_path));
 
         this.maxPE = maxPE;
@@ -107,9 +107,7 @@ public class WorkloadReaderSWF {
         if (current_job == 0) {
             while (true) {
                 try {
-                    for (int s = 0; s < ExperimentSetup.skipJob; s++) {
-                        line = br.readLine();
-                    }
+                    line = br.readLine();
                     values = line.split("\t");
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -218,8 +216,9 @@ public class WorkloadReaderSWF {
         // minPErating is the default speed of the slowest machine in the data set
         double length = Math.round((Integer.parseInt(values[3])) * maxPErating);
 
-        // queue name
-        String queue = values[14];
+        // active_scheduling_queue name
+        //String queue = values[14];
+        int queue = Integer.parseInt(values[14]);
 
         // requested RAM = KB per node (not CPU)
         long ram = Long.parseLong(values[9]);
@@ -233,7 +232,7 @@ public class WorkloadReaderSWF {
         } else {
             if (data_set.contains("zewura") || data_set.contains("wagap") || data_set.contains("meta") || data_set.contains("ncbr")) {
                 ram = Math.round(ram / 1024.0);
-                queue = values[19];
+                queue = Integer.parseInt(values[19]);
             }
             double gbram = Math.round(ram * 10 / 1048576.0) / 10.0;
             //System.out.println(id+ " requests "+ram+" KB RAM, "+gbram+" GB RAM per "+numCPU+" CPUs");
@@ -244,7 +243,7 @@ public class WorkloadReaderSWF {
 
         // skip such job
         /*if (data_set.contains("zewura") || data_set.contains("wagapp") || data_set.contains("meta")) {
-         if (!queue.equals("short") && !queue.equals("long") && !queue.equals("normal") && !queue.equals("backfill") && !queue.equals("preemptible")) {
+         if (!active_scheduling_queue.equals("short") && !active_scheduling_queue.equals("long") && !active_scheduling_queue.equals("normal") && !active_scheduling_queue.equals("backfill") && !active_scheduling_queue.equals("preemptible")) {
          fail++;
          return null;
          }
@@ -288,7 +287,7 @@ public class WorkloadReaderSWF {
 
         double estimatedLength = 0.0;
         if (ExperimentSetup.estimates) {
-            //roughest estimate that can be done = queue limit
+            //roughest estimate that can be done = active_scheduling_queue limit
             estimatedLength = Math.round(Math.max((job_limit * maxPErating), length));
             //System.out.println(id+" Estimates "+estimatedLength+" real = "+length);
         } else {
@@ -306,7 +305,7 @@ public class WorkloadReaderSWF {
         String properties = "";
         if (values.length > 19) {
             properties = values[20];
-            queue = values[19];
+            queue = Integer.parseInt(values[19]);
             gpus = Integer.parseInt(values[18]);
 
             //if (data_set.contains("wagap") || data_set.contains("meta") || data_set.contains("ncbr") || data_set.contains("fairshare")) {
@@ -395,19 +394,7 @@ public class WorkloadReaderSWF {
             }
         }
 
-        if (queue.equals("backfill") && data_set.contains("meta")) {
-            properties += ":^cl_manwe:^cl_mandos:^cl_skirit:^cl_ramdal:^cl_haldir:^cl_gram";
-        }
-
-        if (queue.equals("mikroskop") || queue.equals("quark")) {
-            properties += ":cl_quark";
-        }
-
-        if (queue.contains("ncbr")) {
-            properties += ":cl_perian";
-        }
-
-        if (!Scheduler.all_queues_names.contains(queue) && ExperimentSetup.use_queues) {
+        if (!Scheduler.all_queues_names.contains(queue) && ExperimentSetup.use_multiple_queues) {
             fail++;
             System.out.println("Unknown queue " + queue + " - skipping job " + id);
             return null;
@@ -422,10 +409,10 @@ public class WorkloadReaderSWF {
         ArrayList<Integer> precedingJobs = new ArrayList();
 
         ComplexGridlet gl = new ComplexGridlet(id, user, job_limit, (length), estimatedLength, 10, 10,
-                "Linux", "Risc arch.", arrival, deadline, 1, numCPU, 0.0, queue, properties, perc, ram, numNodes, ppn, gpus, precedingJobs);
+                "Linux", "Risc arch.", arrival, deadline, 1, numCPU, 0.0, queue, properties, perc, ram, numNodes, ppn, gpus, precedingJobs, 0);
 
         // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
-        //System.out.println(id+" job has limit = "+(job_limit/3600.0)+" queue = "+queue);
+        //System.out.println(id+" job has limit = "+(job_limit/3600.0)+" active_scheduling_queue = "+active_scheduling_queue);
         gl.setUserID(GridSim.getEntityId("Alea_Job_Scheduler"));
         current_job++;
         return gl;

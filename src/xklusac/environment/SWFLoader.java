@@ -90,8 +90,8 @@ public class SWFLoader extends GridSim {
 
         folder_prefix = System.getProperty("user.dir");
 
-        System.out.println("Opening job file at: " + ExperimentSetup.data_sets + "/" + data_set);
-        br = r.openFile(new File(ExperimentSetup.data_sets + "/" + data_set));
+        System.out.println("Opening job file at: " + folder_prefix + ExperimentSetup.data_sets_dir + data_set );
+        br = r.openFile(new File(folder_prefix + ExperimentSetup.data_sets_dir + data_set));
         this.total_jobs = total_jobs;
         this.maxPE = maxPE;
         this.minPErating = minPErating;
@@ -145,7 +145,7 @@ public class SWFLoader extends GridSim {
         sim_get_next(ev);
 
         if (ev.get_tag() == GridSimTags.END_OF_SIMULATION) {
-            System.out.println("Shuting down the " + data_set + " JOB LOADER ... with: " + fail + " failed or skipped jobs");
+            System.out.println("Shuting down the " + data_set + " JOB LOADER ... with: " + fail + " unparsable or otherwise skipped jobs");
         }
         shutdownUserEntity();
         super.terminateIOEntities();
@@ -163,10 +163,8 @@ public class SWFLoader extends GridSim {
         if (j == 0) {
             while (true) {
                 try {
-                    for (int s = 0; s < ExperimentSetup.skipJob; s++) {
-                        //System.out.println(j+":"+line+"");
-                        line = br.readLine();
-                    }
+                    //System.out.println(j+":"+line+"");
+                    line = br.readLine();
                     values = line.split("\t");
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -192,6 +190,19 @@ public class SWFLoader extends GridSim {
                         Scheduler.start_date = Long.parseLong(line.replace("; UnixStartTime: ", ""));
                         String dated = new java.text.SimpleDateFormat("HH:mm dd-MM-yyyy").format(new java.util.Date(Scheduler.start_date * 1000));
                         System.out.println("Start time of workload is UnixStartTime: " + Scheduler.start_date + ", [" + dated + "]");
+                    }
+                    if (line.contains("; number of jobs: ")) {
+                        int jobs = Integer.parseInt(line.replace("; number of jobs: ", ""));
+                        if(total_jobs > jobs){
+                            System.out.println("\n================== !!! WARNING !!! ==================");
+                            System.out.println("AleaNG will read all " + jobs+" jobs from workload file. \n(Shortening the number specified in config: "+total_jobs+" jobs)");
+                            System.out.println("================== !!! WARNING !!! ==================\n");
+                            total_jobs = jobs;
+                        }else{
+                            System.out.println("\n================== !!! WARNING !!! ==================");
+                            System.out.println("AleaNG will read only " + total_jobs+" jobs from workload file. \n(Shortening the number specified in file: "+jobs+" jobs)");
+                            System.out.println("================== !!! WARNING !!! ==================\n");
+                        }
                     }
                     //System.out.println("comment--- "+values[0]);
                 }
@@ -251,11 +262,10 @@ public class SWFLoader extends GridSim {
 
         // we do not allow more PEs for one job than there is on the "biggest" machine.
         // Co-allocation is only supported over one cluster (GridResource) by now.
-        if (numCPU > maxPE) {
+        /*if (numCPU > maxPE) {
             numCPU = maxPE;
 
-        }
-
+        }*/
         long arrival = 0;
         // synchronize GridSim's arrivals with the UNIX epoch format as given in GWF
         if (start_time < 0) {
@@ -279,8 +289,8 @@ public class SWFLoader extends GridSim {
         // minPErating is the default speed of the slowest machine in the data set        
         double length = Math.round((Integer.parseInt(values[3])) * maxPErating);
 
-        // queue name
-        String queue = values[14];
+        // active_scheduling_queue name
+        int queue = Integer.parseInt(values[14]);
 
         // requested RAM = KB per node (not CPU)
         long ram = Long.parseLong(values[9]);
@@ -332,7 +342,7 @@ public class SWFLoader extends GridSim {
 
         double estimatedLength = 0.0;
         if (ExperimentSetup.estimates) {
-            //roughest estimate that can be done = queue limit        
+            //roughest estimate that can be done = active_scheduling_queue limit        
             estimatedLength = Math.round(Math.max((job_limit * maxPErating), length));
             //System.out.println(id+" Estimates "+estimatedLength+" real = "+length);
         } else {
@@ -370,6 +380,10 @@ public class SWFLoader extends GridSim {
                     System.out.println(id + ": numNodes value is wrong, CPUs = " + numCPU + " ppn = " + ppn);
                 }
             }
+            if (ExperimentSetup.allocate_whole_nodes) {
+                numNodes = numCPU;
+                ppn = 1;
+            }
 
             if (ppn == -1 || numNodes == -1) {
                 String[] spec = properties.split("x");
@@ -381,6 +395,7 @@ public class SWFLoader extends GridSim {
                 System.out.println(id + ": still CPUs mismatch CPUs = " + numCPU + " ppn = " + ppn + " nodes = " + numNodes);
                 numCPU = ppn * numNodes;
             }
+
         }
 
         // obsolete and useless
@@ -389,12 +404,6 @@ public class SWFLoader extends GridSim {
         job_limit = Math.max(1, Math.round(job_limit / ExperimentSetup.runtime_minimizer));
         length = Math.max(1.0, Math.round(length / ExperimentSetup.runtime_minimizer));
         estimatedLength = Math.max(1, Math.round(estimatedLength / ExperimentSetup.runtime_minimizer));
-
-        if (!Scheduler.all_queues_names.contains(queue) && ExperimentSetup.use_queues) {
-            fail++;
-            System.out.println("Unknown queue " + queue + " - skipping job " + id);
-            return null;
-        }
 
         // manually established - fix it according to your needs
         double deadline = job_limit * 2;
@@ -416,12 +425,16 @@ public class SWFLoader extends GridSim {
 
         String arch = "RISC";
 
-        int gpus_per_node = gpus / numNodes;
-        if ((numNodes * gpus_per_node) != gpus) {
-            System.out.println(id + " ERROR: gpu and gpu_per_node mismatch: " + numNodes + " numNodes, " + gpus + " gpus, " + gpus_per_node + " gpus_per_node.");
+        int gpus_per_node;
+        if (ExperimentSetup.allocate_whole_nodes) {
+            gpus_per_node = gpus / numNodes;
+        } else {
+            gpus_per_node = gpus / numNodes;
+            if ((numNodes * gpus_per_node) != gpus) {
+                System.out.println(id + " ERROR: gpu and gpu_per_node mismatch: " + numNodes + " numNodes, " + gpus + " gpus, " + gpus_per_node + " gpus_per_node.");
+            }
         }
 
-        
         // DATA for synthetic experiment
         /*
         // big user
@@ -444,12 +457,10 @@ public class SWFLoader extends GridSim {
         }
         ram = 100;
         gpus_per_node = Math.min(0, gpus_per_node);
-       */
-        
+         */
         // END of synth experiment
-        
         // DATA for PBS comparison experiment
-        gpus_per_node = Math.min(0, gpus_per_node);
+        /*gpus_per_node = Math.min(0, gpus_per_node);
         length = Math.min(length, 3600*168);
         
         if(numCPU<=4){
@@ -462,11 +473,35 @@ public class SWFLoader extends GridSim {
         }else{
             user = "large";
         }
-        
+         */
         //System.out.println("su "+user+" -c \"cd; qsub -l walltime=2:00:00 -m n -o /dev/null -e /dev/null -l select=${"+numCPU+"}:ncpus=1:mem=300mb -- /usr/bin/sleep $"+(length)+"\"");
-        
+        int group = Integer.parseInt(values[12]);
+
+        /*if (id % 5 == 0) {
+            properties = "all";
+            queue = 0;
+            group = 0;
+            user = "0";
+            
+        } else {
+            properties = "normal";
+            queue = 2;
+            group = 1;
+            user = "1";
+            if (id % 2 == 0) {
+                user = "2";
+                queue = 1;
+            }
+
+        }*/
+        if (!Scheduler.all_queues_names.contains(ExperimentSetup.queues_id_to_name_mapping.get(queue)) && ExperimentSetup.use_multiple_queues) {
+            fail++;
+            System.out.println("Unknown queue " + queue + " - skipping job " + id);
+            return null;
+        }
+
         ComplexGridlet gl = new ComplexGridlet(id, user, job_limit, (length), estimatedLength, 0, 0,
-                "Linux", arch, arrival, deadline, 1, numCPU, 0.0, queue, properties, perc, ram, numNodes, ppn, gpus_per_node, precedingJobs);
+                "Linux", arch, arrival, deadline, 1, numCPU, 0.0, queue, properties, perc, ram, numNodes, ppn, gpus_per_node, precedingJobs, group);
 
         // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
         //System.out.println("[JOB LOADER] Sending job "+id+" from "+gl.getArchRequired()+" to scheduler. Job has limit = "+job_limit+" seconds,  requires "+numNodes+" nodes each with "+ppn+" CPUs [total "+numCPU+" CPUs]. RAM required per node = "+(ram/(1024.0*1024))+" GB. Sim. time = "+GridSim.clock());

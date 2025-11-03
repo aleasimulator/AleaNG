@@ -9,12 +9,9 @@ import xklusac.algorithms.schedule_based.optimization.WeightedRandomSearch;
 import xklusac.algorithms.schedule_based.CONS;
 import xklusac.algorithms.schedule_based.FairshareCONS;
 import xklusac.algorithms.queue_based.multi_queue.EASY_Backfilling;
-import xklusac.algorithms.queue_based.multi_queue.FairshareMetaBackfilling;
 import xklusac.algorithms.queue_based.PBS_PRO;
-import xklusac.algorithms.queue_based.multi_queue.FairshareFCFS;
 import xklusac.algorithms.queue_based.multi_queue.FairshareOptimizedMetaBackfilling;
 import xklusac.algorithms.queue_based.EDF;
-import xklusac.algorithms.queue_based.multi_queue.Fairshare_EASY_Backfilling;
 import xklusac.algorithms.queue_based.SJF;
 import xklusac.algorithms.queue_based.multi_queue.FCFS;
 import alea.core.Registration;
@@ -31,6 +28,9 @@ import xklusac.extensions.*;
 import xklusac.extensions.Queue;
 import xklusac.algorithms.*;
 import xklusac.algorithms.queue_based.multi_queue.AggressiveBackfillingFastDeepHold;
+import xklusac.algorithms.queue_based.multi_queue.FairshareAggressiveBackfillingPreempt;
+import xklusac.algorithms.queue_based.multi_queue.FairshareEASY_BackfillingPreempt;
+import xklusac.algorithms.queue_based.multi_queue.FairshareStrictOrderingPreempt;
 import xklusac.algorithms.schedule_based.FCFS_Plan;
 import xklusac.plugins.Plugin;
 import xklusac.plugins.PluginConfiguration;
@@ -99,10 +99,6 @@ public class ExperimentSetup {
     public static boolean visualize_schedule;
 
     /**
-     * set true to use specific job requirements
-     */
-    static boolean reqs;
-    /**
      * set true to use job runtime estimates
      */
     public static boolean estimates;
@@ -141,6 +137,7 @@ public class ExperimentSetup {
      * heap is faster than the default array.
      */
     static boolean use_heap;
+    public static boolean draw_chart;
     /**
      * random number generator seed
      */
@@ -154,13 +151,21 @@ public class ExperimentSetup {
      * set of users in the system
      */
     public static Hashtable<String, User> users = new Hashtable<String, User>();
-    
+
     public static LinkedList<String> user_logins = new LinkedList<String>();
-    
+
+    public static Hashtable<Integer, FairshareGroup> groups = new Hashtable<Integer, FairshareGroup>();
+
     /**
      * set of queues in the system
      */
     public static Hashtable<String, Queue> queues = new Hashtable<String, Queue>();
+
+    /**
+     * a map that links queue ID (used in SWF) to queue name (used in simulator)
+     */
+    public static Hashtable<Integer, String> queues_id_to_name_mapping = new Hashtable<Integer, String>();
+
     /**
      * multiplies the number of iterations of opt. algorithms
      */
@@ -187,7 +192,7 @@ public class ExperimentSetup {
     /**
      * ID of current sched. algorithm
      */
-    static int algID;
+    public static int algID;
     /**
      * ID of previous sched. algorithm
      */
@@ -242,6 +247,7 @@ public class ExperimentSetup {
      */
     public static boolean use_speeds;
     public static boolean enforce_partition;
+    public static boolean allocate_whole_nodes;
     /**
      * can be used to compress job inter-arrival times (1.0 = original, 2.0 =
      * twice that fast)
@@ -278,10 +284,16 @@ public class ExperimentSetup {
      * defines whether to use fairshare decay
      */
     public static boolean use_decay;
-    
+
     public static double PBS_factor = 1.0;
-    
+
+    public static int chart_width = 0;
+    public static int chart_height = 0;
+    public static boolean basic_charts;
+
+    public static int sample_tick;
     public static int decay_interval;
+    public static int fairshare_update_interval;
     public static double decay_factor;
     /**
      * defines whether to multiply sum of CPU and RAM in fairhshare
@@ -299,6 +311,8 @@ public class ExperimentSetup {
      * defines whether to sum multiplications of CPU and RAM in fairhshare
      */
     public static boolean sum_multiplications;
+
+    public static boolean use_EN_decimal;
     /**
      * defines total available RAM in the system
      */
@@ -307,10 +321,6 @@ public class ExperimentSetup {
      * defines total available CPUs in the system
      */
     public static double avail_CPUs;
-    /**
-     * defines how many jobs should be skipped in the data set
-     */
-    public static int skipJob;
     /**
      * counter measuring the number of backfilled jobs
      */
@@ -341,12 +351,16 @@ public class ExperimentSetup {
      */
     public static boolean resource_spec_packing;
     public static boolean extract_jobs;
+    public static boolean use_preemption;
+    public static boolean requeue;
+    public static boolean use_checkpoint;
     /**
      * defines whether several different queues in the system should be used.
      * Such queues must be specified in a seperate file, along with job and
      * machine descriptions.
      */
-    public static boolean use_queues;
+    public static boolean use_multiple_queues;
+    public static boolean use_user_groups;
     public static boolean use_gaps = true;
 
     public static ResultCollector result_collector = null;
@@ -354,15 +368,18 @@ public class ExperimentSetup {
     //private static String subDir;
     public static String alea_version = "NG (Next Generation)";
 
+    public static int simulation_run = -1;
+
     /**
      * if several different queues in the system should are defined, this
-     * variable defines whether they will be used separately (queue-by-queue in
-     * a defined priority order) or they will only be used to guard
-     * queue-limits.
+     * variable defines whether they will be used separately
+     * (active_scheduling_queue-by-active_scheduling_queue in a defined priority
+     * order) or they will only be used to guard active_scheduling_queue-limits.
      */
     public static boolean by_queue;
 
-    public static String data_sets;
+    public static String data_sets_dir;
+    public static String workload_file;
 
     private static String[] dir = new String[4];
 
@@ -452,9 +469,12 @@ public class ExperimentSetup {
         prevAlgID = -1;
         name = "";
 
-        use_tsafrir = aCfg.getBoolean("use_tsafrir");
+        basic_charts = aCfg.getBoolean("only_basic_charts");
+        chart_width = aCfg.getInt("chart_width");
+        chart_height = aCfg.getInt("chart_height");
         use_speeds = aCfg.getBoolean("use_speeds");
         enforce_partition = aCfg.getBoolean("enforce_partition");
+        allocate_whole_nodes = aCfg.getBoolean("allocate_whole_nodes");
         arrival_rate_multiplier = aCfg.getDouble("arrival_rate_multiplier");
         runtime_minimizer = aCfg.getDouble("runtime_minimizer");
         use_RAM = aCfg.getBoolean("use_RAM");
@@ -462,9 +482,12 @@ public class ExperimentSetup {
         use_fairshare_RAM = aCfg.getBoolean("use_fairshare_RAM");
         use_fairshare = aCfg.getBoolean("use_fairshare");
         use_decay = aCfg.getBoolean("use_decay");
+        draw_chart = aCfg.getBoolean("draw_chart");
         PBS_factor = aCfg.getDouble("PBS_factor");
         decay_interval = aCfg.getInt("decay_interval");
+        fairshare_update_interval = aCfg.getInt("fairshare_update_interval");
         decay_factor = aCfg.getDouble("decay_factor");
+        sample_tick = aCfg.getInt("sample_tick");
         multiply_sums = aCfg.getBoolean("multiply_sums");
         use_MAX = aCfg.getBoolean("use_MAX");
         use_SQRT = aCfg.getBoolean("use_SQRT");
@@ -473,6 +496,12 @@ public class ExperimentSetup {
 
         limit_schedule_size = aCfg.getBoolean("limit_schedule_size");
         extract_jobs = aCfg.getBoolean("extract_jobs");
+        use_preemption = aCfg.getBoolean("use_preemption");
+        use_EN_decimal = aCfg.getBoolean("use_EN_decimal");
+
+        requeue = aCfg.getBoolean("requeue");
+        use_checkpoint = aCfg.getBoolean("use_checkpoint");
+
         max_schedule_length = aCfg.getInt("max_schedule_length");
         max_schedule_CPU_request_factor = aCfg.getDouble("max_schedule_CPU_request_factor");
 
@@ -483,9 +512,10 @@ public class ExperimentSetup {
         backfilled_cons = 0;
 
         // set true to use different queues
-        use_queues = aCfg.getBoolean("use_queues");
+        use_multiple_queues = aCfg.getBoolean("use_multiple_queues");
+        use_user_groups = aCfg.getBoolean("use_user_groups");
         by_queue = aCfg.getBoolean("by_queue");
-        data_sets = aCfg.getString("data_set_dir");
+        data_sets_dir = aCfg.getString("data_set_dir");
 
         // if required - start the graphical output using -v parameter
         if (args.length > 0) {
@@ -535,8 +565,7 @@ public class ExperimentSetup {
 
         // set true to use failures
         failures = aCfg.getBoolean("failures");
-        // set true to use specific job requirements
-        reqs = aCfg.getBoolean("reqs");
+
         // set true to use runtime estimates
         //estimates = aCfg.getBoolean("estimates");
         // set true to refine estimates using job avg. length
@@ -554,11 +583,11 @@ public class ExperimentSetup {
 
         //defines the name format of output files
         String problem = "Result";
-        if (!failures && !reqs) {
+        if (!failures && !enforce_partition) {
             problem += "Basic";
         }
-        if (reqs) {
-            problem += "R-";
+        if (enforce_partition) {
+            problem += "P-";
         }
         if (failures) {
             problem += "F";
@@ -637,10 +666,12 @@ public class ExperimentSetup {
             pluginConfigurations.add(plugincfg);
         }
 
-        // this cycle selects data set from data_sets[] list
+        // this cycle selects data set from data_sets_dir[] list
         for (int set = 0; set < data_sets.length; set++) {
             //creates new folder for each data set in the new setup folder
             String date = getDate();
+            //workload_file = data_sets_dir[set] + "__" + date;
+            workload_file = data_sets[set];
             dir[2] = data_sets[set] + "_" + date;
             File dataSetDirF = new File(ExperimentSetup.getDir(DirectoryLevel.DATA_SET));
             dataSetDirF.mkdir();
@@ -667,7 +698,6 @@ public class ExperimentSetup {
             boolean estimateMPERC[] = aCfg.getBooleanArray("estimateMaxPERC");
             boolean estimate[] = aCfg.getBooleanArray("estimate");
             boolean use_resource_spec_packing[] = aCfg.getBooleanArray("use_resource_spec_packing");
-            int skip[] = aCfg.getIntArray("skip");
 
             int timeskip[] = aCfg.getIntArray("first_arrival");
             /*for (int i = 0; i < timeskip.length; i++) {
@@ -684,6 +714,8 @@ public class ExperimentSetup {
             // select which algorithms from the algorithms[] list will be used.
             for (int sel_alg = 0; sel_alg < algorithms.length; sel_alg++) {
 
+                simulation_run++;
+
                 anti_starvation = use_anti_starvation[sel_alg];
 
                 use_AvgLength = estimateAVG[sel_alg];
@@ -694,7 +726,7 @@ public class ExperimentSetup {
                 pinJob = pinJobs[sel_alg];
 
                 resource_spec_packing = use_resource_spec_packing[sel_alg];
-                skipJob = skip[set];
+
                 firstArrival = timeskip[set];
 
                 // reset values from previous iterations
@@ -726,23 +758,59 @@ public class ExperimentSetup {
                     String report_name = null;
                     GridSim.init(entities, calendar, trace_flag, exclude_from_file, exclude_from_processing, report_name);
                     int rnd = new Random().nextInt();
-                    scheduler = new Scheduler(scheduler_name, baudRate, entities, results, alg, data_sets[set], total_gridlet[set], suff, windows, result_collector, sel_alg);
+                    scheduler = new Scheduler(scheduler_name, baudRate, entities, results, alg, data_sets[set], suff, windows, result_collector, sel_alg);
                 } catch (Exception ex) {
                     Logger.getLogger(ExperimentSetup.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 // this will set up the proper algorithm according to the algorithms[] list
                 if (alg == 0) {
+                    // Fairshare ordered FCFS
+                    policy = new FairshareStrictOrderingPreempt(scheduler);
+                    suff = "StrictOrdering";
+                    if (use_preemption) {
+                        Scheduler.scheduling_algorithm = "Strict Ordering(Pr)";
+                        suff = "StrictOrdering(Pr)";
+                    } else {
+                        Scheduler.scheduling_algorithm = "Strict Ordering";
+                        suff = "StrictOrdering";
+                    }
+                }
+                if (alg == 1) {
+                    // Backfilling without a reservation
+                    policy = new FairshareAggressiveBackfillingPreempt(scheduler);
+                    if (use_preemption) {
+                        Scheduler.scheduling_algorithm = "Aggressive Backfill(Pr)";
+                        suff = "FairshareAggressiveBackfill(Pr)";
+                    } else {
+                        Scheduler.scheduling_algorithm = "Aggressive Backfill";
+                        suff = "FairshareAggressiveBackfill";
+
+                    }
+                }
+                if (alg == 2) {
+                    // EASY Backfilling with fairsharing
+                    policy = new FairshareEASY_BackfillingPreempt(scheduler);
+                    if (use_preemption) {
+                        Scheduler.scheduling_algorithm = "EASY Backfill(Pr)";
+                        suff = "EASYBackfill(Pr)";
+                    } else {
+                        Scheduler.scheduling_algorithm = "EASY Backfill";
+                        suff = "EASYBackfill";
+
+                    }
+                }
+                if (alg == 7) {
                     policy = new FCFS(scheduler);
                     suff = "FCFS";
                     if (resource_spec_packing) {
                         suff += "-pack";
                     }
                 }
-                if (alg == 1) {
+                if (alg == 8) {
                     policy = new EDF(scheduler);
                     suff = "EDF";
                 }
-                if (alg == 2) {
+                if (alg == 9) {
                     policy = new EASY_Backfilling(scheduler);
                     // fixed version of EASY Backfilling
                     suff = "EASY";
@@ -771,24 +839,7 @@ public class ExperimentSetup {
                     // Shortest Job First policy
                     suff = "SJF";
                 }
-                if (alg == 7) {
-                    policy = new FairshareFCFS(scheduler);
-                    // Fairshare ordered FCFS
-                    suff = "FairShareFCFS";
-                    Scheduler.scheduling_algorithm = "Strict Ordering";
-                }
-                if (alg == 8) {
-                    policy = new FairshareMetaBackfilling(scheduler);
-                    Scheduler.scheduling_algorithm = "Aggressive Backfilling";
-                    // Backfilling without a reservation
-                    suff = "FairShareMetaBackfilling";
-                    if (anti_starvation) {
-                        suff += "-str";
-                    }
-                    if (resource_spec_packing) {
-                        suff += "-pack";
-                    }
-                }
+                
                 if (alg == 12) {
                     policy = new FairshareOptimizedMetaBackfilling(scheduler);
                     // Backfilling without a reservation
@@ -800,7 +851,7 @@ public class ExperimentSetup {
                         suff += "-pack";
                     }
                 }
-                if (alg == 9) {
+                if (alg == 13) {
                     policy = new FairshareCONS(scheduler);
                     // Conservative backfilling with fairshare (no RAM support)
                     use_compresion = true;
@@ -891,15 +942,9 @@ public class ExperimentSetup {
                     policy = new CONS(scheduler);
                 }
 
-                if (alg == 22) {
-                    policy = new Fairshare_EASY_Backfilling(scheduler);
-                    Scheduler.scheduling_algorithm = "Easy Backfilling";
-                    // fixed version of EASY Backfilling
-                    suff = "EASY-Fair";
-                }
                 if (alg == 23) {
                     policy = new BF_CONS_Fair(scheduler);
-                    // faster version of FairshareCONS (queue is not reshuffled every time)
+                    // faster version of FairshareCONS (active_scheduling_queue is not reshuffled every time)
                     // cannot be used when periodic fairshare update is enabled
                     // this update would break the detection of fairshare changes in BF_CONS_Fair
                     use_compresion = true;
@@ -941,11 +986,9 @@ public class ExperimentSetup {
                 }
                 result_collector.deleteSchedResults(suff);//originally in Scheduler constructor
 
-                System.out.println("Now scheduling " + total_gridlet[set] + " jobs by: " + suff + ", using " + data_sets[set] + " data set.");
-
                 suff += "@" + data_sets[set];
 
-                // this cycle may be used when some modifications of one data set are required in multiple runs of Alea 3.0 over same data-set.
+                // this cycle may be used when some modifications of one data set are required in multiple runs of AleaNG over same data-set.
                 for (int pass_count = 1; pass_count <= experiment_count; pass_count++) {
                     List<Plugin> plugins = new ArrayList<Plugin>();
                     //create instances of plugins and add them to the list
@@ -967,13 +1010,19 @@ public class ExperimentSetup {
                     try {
                         // creates entities
                         String job_loader_name = data_sets[set] + "_JobLoader";
-                        if (use_queues) {
+                        if (use_multiple_queues) {
                             // queues from data file
                             QueueLoader q_loader = new QueueLoader(data_sets[set]);
                         } else {
-                            // default queue
+                            // default active_scheduling_queue
                             Scheduler.all_queues.addLast(new LinkedList<GridletInfo>());
                         }
+                        if (use_user_groups) {
+                            // groups and users from data file
+                            FairshareGroupLoader g_loader = new FairshareGroupLoader(data_sets[set]);
+                            FairshareUserLoader u_loader = new FairshareUserLoader(data_sets[set]);
+                        }
+
                         // creates all grid resources
                         MachineLoader m_loader = new MachineLoader(10000, 3.0, data_sets[set]);
                         rnd_seed = sel_alg;
@@ -988,6 +1037,7 @@ public class ExperimentSetup {
                             String failure_loader_name = data_sets[set] + "_FailureLoader";
                             FailureLoaderNew failure = new FailureLoaderNew(failure_loader_name, baudRate, data_sets[set], clusterNames, machineNames, 0);
                         }
+                        System.out.println("Now scheduling " + total_gridlet[set] + " jobs by: " + suff + ", using " + data_sets[set] + " data set.");
                         // start the simulation
                         System.out.println("Starting simulation using Alea " + alea_version);
 
@@ -1022,9 +1072,9 @@ public class ExperimentSetup {
                     Sim_system.setInComplete(true);
                     // store results
                     result_collector.generateResults(suff, experiment_count);
+                    System.out.println("Max. runtime estimate has been used = " + max_estim + ". Number of backfilled jobs = " + backfilled);
                     result_collector.reset();
                     results.clear();
-                    System.out.println("Max. estimate has been used = " + max_estim + " backfilled jobs = " + backfilled);
                     System.gc();
                 }
             }

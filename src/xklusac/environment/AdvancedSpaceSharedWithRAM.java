@@ -112,7 +112,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
 
                 used_mips = Math.round((used_mips / mips) * 10000.0);
                 used_usage = Math.round((used_usage / usage) * 10000.0);
-                System.out.println(resource_.getResourceName() + " wusage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened = " + shortened);
+                System.out.println("Cluster "+resource_.getResourceName() + ": weigh. usage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened jobs due to exceeded runtime limit = " + shortened);
                 failure_time = 0.0;
                 wfailure_time = 0.0;
                 used_mips = 0.0;
@@ -250,7 +250,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             //String userName = GridSim.getEntityName( gl.getUserID() );
             int freePE = this.getNumFreePE();
             //System.out.println(rgl.getGridletID() + " allocating... queued = "+gridletQueueList_.size());
-            // Do not allow anticipating if there is a gridlet in waiting queue. This can happen
+            // Do not allow anticipating if there is a gridlet in waiting active_scheduling_queue. This can happen
             // when i.e., single PE requiring gridlet arrive and only 1 slot is free at the moment.
             if (numPE <= freePE && gridletQueueList_.size() == 0) {
                 // Start now - Enough free PEs on resource                
@@ -583,7 +583,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 ResGridlet obj = (ResGridlet) gridletQueueList_.getFirst();
 
                 // allocate the Gridlet into an empty PE slot and remove it from
-                // the queue list
+                // the active_scheduling_queue list
                 if (obj.getNumPE() > 1) {
                     if (resource_.getNumFreePE() >= obj.getNumPE()) {
                         // Do not even try to allocate if not enough PEs free

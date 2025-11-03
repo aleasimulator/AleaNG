@@ -47,7 +47,7 @@ public class Output{
         //pw.close();
     }
     
-    public void writeStringWriterErr(PrintWriter pw, String value)
+    public void writeStringToFile(PrintWriter pw, String value)
     throws IOException {
         //System.out.println("ok "+value);
         pw.println(value);

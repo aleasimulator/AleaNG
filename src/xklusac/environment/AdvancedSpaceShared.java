@@ -8,15 +8,19 @@ import java.util.LinkedList;
 import xklusac.environment.FailureLoaderNew.Failure;
 
 /**
- * Class AdvancedSpaceShared (version 1.0)<p>
- * This class is an allocation policy for GridResource that behaves
- * exactly like First Come First Serve (FCFS). This is a basic and simple
- * scheduler that runs each Gridlet to one or more Processing Element (PE).
- * If a Gridlet requires more than one PE, then this scheduler wait till these PEs are
- * available. If the gridlet requires more PEs than is available in the whole resource the gridlet is returned
- * as FAILED. In this version <b>simple co-allocation</b> is allowed such that parallel jobs may be executed on one or more machines
- * if necessary (not enough PEs is available on single machine).<p>
- * Moreover, it allows to simulate specific machine's failures, killing (and returning to the Scheduler) such jobs at such machine.
+ * Class AdvancedSpaceShared (version 1.0)
+ * <p>
+ * This class is an allocation policy for GridResource that behaves exactly like
+ * First Come First Serve (FCFS). This is a basic and simple scheduler that runs
+ * each Gridlet to one or more Processing Element (PE). If a Gridlet requires
+ * more than one PE, then this scheduler wait till these PEs are available. If
+ * the gridlet requires more PEs than is available in the whole resource the
+ * gridlet is returned as FAILED. In this version <b>simple co-allocation</b> is
+ * allowed such that parallel jobs may be executed on one or more machines if
+ * necessary (not enough PEs is available on single machine)
+ * .<p>
+ * Moreover, it allows to simulate specific machine's failures, killing (and
+ * returning to the Scheduler) such jobs at such machine.
  *
  * @author Manzur Murshed and Rajkumar Buyya
  * @author Anthony Sulistio (re-written this class)
@@ -45,24 +49,23 @@ class AdvancedSpaceShared extends AllocPolicy {
     /**
      * Allocates a new AdvancedSpaceShared object
      *
-     * @param resourceName    the GridResource entity name that will contain
-     *                        this allocation policy
-     * @param entityName      this object entity name
+     * @param resourceName the GridResource entity name that will contain this
+     * allocation policy
+     * @param entityName this object entity name
      * @see gridsim.GridSim#init(int, Calendar, boolean, String[], String[],
-     *          String)
+     * String)
      * @post $none
      * @pre resourceName != null
      * @pre entityName != null
      * @throws Exception This happens when one of the following scenarios occur:
-     *      <ul>
-     *          <li> creating this entity before initializing GridSim package
-     *          <li> this entity name is <tt>null</tt> or empty
-     *          <li> this entity has <tt>zero</tt> number of PEs (Processing
-     *              Elements). <br>
-     *              No PEs mean the Gridlets can't be processed.
-     *              A GridResource must contain one or more Machines.
-     *              A Machine must contain one or more PEs.
-     *      </ul>
+     * <ul>
+     * <li> creating this entity before initializing GridSim package
+     * <li> this entity name is <tt>null</tt> or empty
+     * <li> this entity has <tt>zero</tt> number of PEs (Processing Elements).
+     * <br>
+     * No PEs mean the Gridlets can't be processed. A GridResource must contain
+     * one or more Machines. A Machine must contain one or more PEs.
+     * </ul>
      */
     AdvancedSpaceShared(String resourceName, String entityName, ComplexResourceCharacteristics resConfig) throws Exception {
         super(resourceName, entityName);
@@ -82,6 +85,7 @@ class AdvancedSpaceShared extends AllocPolicy {
 
     /**
      * Handles internal events that are coming to this entity.
+     *
      * @pre $none
      * @post $none
      */
@@ -99,15 +103,14 @@ class AdvancedSpaceShared extends AllocPolicy {
             machineRating_[i] = super.resource_.getMIPSRatingOfOnePE(i, indexPE);
         }
 
-
         // a loop that is looking for internal events only
         Sim_event ev = new Sim_event();
         while (Sim_system.running()) {
             super.sim_get_next(ev);
 
             // if the simulation finishes then exit the loop
-            if (ev.get_tag() == GridSimTags.END_OF_SIMULATION ||
-                    super.isEndSimulation() == true) {
+            if (ev.get_tag() == GridSimTags.END_OF_SIMULATION
+                    || super.isEndSimulation() == true) {
                 double mips = resource_.getMIPSRating() * GridSim.clock();
                 mips -= wfailure_time;
                 double usage = resource_.getNumPE() * GridSim.clock();
@@ -115,7 +118,7 @@ class AdvancedSpaceShared extends AllocPolicy {
 
                 used_mips = Math.round((used_mips / mips) * 10000.0);
                 used_usage = Math.round((used_usage / usage) * 10000.0);
-                System.out.println(resource_.getResourceName() + " wusage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened = " + shortened);
+                System.out.println("Cluster " + resource_.getResourceName() + ": weigh. usage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened jobs due to exceeded runtime limit = " + shortened);
                 failure_time = 0.0;
                 wfailure_time = 0.0;
                 used_mips = 0.0;
@@ -177,18 +180,16 @@ class AdvancedSpaceShared extends AllocPolicy {
                 continue;
             }
             if (ev.get_tag() == AleaSimTags.FAILURE_START) {
-                super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.FAILURE_START, this.resId_+"x"+this.killed_cpus);
+                super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.FAILURE_START, this.resId_ + "x" + this.killed_cpus);
                 //super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.FAILURE_START, this.killed_cpus);
                 continue;
             }
-
 
             // Internal Event if the event source is this entity
             if (ev.get_src() == super.myId_ && gridletInExecList_.size() > 0) {
 
                 //updateGridletProcessing();   // update Gridlets
                 //checkGridletCompletion();    // check for finished Gridlets
-                
                 ResGridlet rgl = (ResGridlet) ev.get_data();
                 endGridlet(rgl);
             }
@@ -203,30 +204,73 @@ class AdvancedSpaceShared extends AllocPolicy {
             if (ev.get_tag() == AleaSimTags.FAILURE_FINISHED || ev.get_tag() == AleaSimTags.FAILURE_RESTART2) {
                 System.out.println(super.resName_ + " ignore resource/machine restart.");
             } else {
-                System.out.println(super.resName_ +
-                        ".SpaceShared.body(): ignore internal events");
+                System.out.println(super.resName_
+                        + ".SpaceShared.body(): ignore internal events");
             }
         }
     }
-    
-    private void endGridlet(ResGridlet obj){
+
+    private void endGridlet(ResGridlet obj) {
         double load = getMIShare(obj.getGridletLength(), obj.getMachineID());
         obj.updateGridletFinishedSoFar(load);
         //System.out.println(obj.getGridletID()+ " updated finSoFar by: "+load+ " load at time "+GridSim.clock());
-        gridletInExecList_.remove(obj);
-        gridletFinish(obj, Gridlet.SUCCESS);
+        boolean isStillRunning = gridletInExecList_.remove(obj);
+        if (isStillRunning) {
+            gridletFinish(obj, Gridlet.SUCCESS);
+        }
         //System.out.println("END "+obj.getGridletID()+ " finished at time: "+GridSim.clock()+" remain: "+obj.getRemainingGridletLength());
+    }
+
+    private void endCheckpointedGridlet(ResGridlet obj) {
+        double dur = Math.max(0.0, GridSim.clock() - obj.getExecStartTime());
+        double load = getMIShare(dur, obj.getMachineID());
+        obj.updateGridletFinishedSoFar(load);
+        //System.out.println(obj.getGridletID()+ " updated finSoFar by: "+load+ " load at time "+GridSim.clock());
+        gridletInExecList_.remove(obj);
+        gridletFinish(obj, Gridlet.PAUSED);
+        //System.out.println("Checkpointing: " + obj.getGridletID() + " at time: " + GridSim.clock() + " remain: " + obj.getRemainingGridletLength() + " of: " + obj.getGridletLength() + " after dur: " + dur+ " freeing "+obj.getNumPE()+" CPUs");
+        // submit it back to Scheduler as new job with a small delay
+        if (ExperimentSetup.requeue) {
+            // either start from checkpoint or restart from start
+            if (ExperimentSetup.use_checkpoint) {
+                // shorten this job according to already used CPU time (start from the checkpoint)
+                ComplexGridlet og = (ComplexGridlet) obj.getGridlet();
+                ComplexGridlet gl = new ComplexGridlet(og.getGridletID(), og.getUser(), Math.round(og.getJobLimit() - dur), Math.round(obj.getRemainingGridletLength()), Math.max(1, (og.getEstimatedLength() - dur)), 0, 0,
+                        "Linux", og.getArchRequired(), og.getArrival_time(), og.getDue_date(), 1, og.getNumPE(), 0.0, og.getQueueID(), og.getProperties(),
+                        og.getPercentage(), og.getRam(), og.getNumNodes(), og.getPpn(), og.getGpus_per_node(), og.getPrecedingJobs(), og.getGroupID());
+
+                // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
+                //System.out.println("[JOB LOADER] Sending job "+id+" from "+gl.getArchRequired()+" to scheduler. Job has limit = "+job_limit+" seconds,  requires "+numNodes+" nodes each with "+ppn+" CPUs [total "+numCPU+" CPUs]. RAM required per node = "+(ram/(1024.0*1024))+" GB. Sim. time = "+GridSim.clock());
+                gl.setUserID(GridSim.getEntityId("Alea_Job_Scheduler"));
+                gl.setPreempted(true);
+                super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.5, AleaSimTags.GRIDLET_INFO, gl);
+            } else {
+                // restart from scratch
+                ComplexGridlet og = (ComplexGridlet) obj.getGridlet();
+                ComplexGridlet gl = new ComplexGridlet(og.getGridletID(), og.getUser(), og.getJobLimit(), obj.getGridletLength(), Math.max(1, (og.getEstimatedLength())), 0, 0,
+                        "Linux", og.getArchRequired(), og.getArrival_time(), og.getDue_date(), 1, og.getNumPE(), 0.0, og.getQueueID(), og.getProperties(),
+                        og.getPercentage(), og.getRam(), og.getNumNodes(), og.getPpn(), og.getGpus_per_node(), og.getPrecedingJobs(), og.getGroupID());
+
+                // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
+                //System.out.println("[JOB LOADER] Sending job "+id+" from "+gl.getArchRequired()+" to scheduler. Job has limit = "+job_limit+" seconds,  requires "+numNodes+" nodes each with "+ppn+" CPUs [total "+numCPU+" CPUs]. RAM required per node = "+(ram/(1024.0*1024))+" GB. Sim. time = "+GridSim.clock());
+                gl.setUserID(GridSim.getEntityId("Alea_Job_Scheduler"));
+                gl.setPreempted(true);
+                super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.5, AleaSimTags.GRIDLET_INFO, gl);
+            }
+        }
+        //System.out.println("Requeueing: " + gl.getGridletID() + " at time: " + GridSim.clock());
     }
 
     /**
      * Schedules a new Gridlet that has been received by the GridResource
      * entity. If the gridlet requires more than 1 PE it waits until all
-     * required PEs are free. If the resource does not have enough PEs to
-     * run the gridlet, gridlet is returned as FAILED.
-     * @param   gl    a Gridlet object that is going to be executed
-     * @param   ack   an acknowledgement, i.e. <tt>true</tt> if wanted to know
-     *        whether this operation is success or not, <tt>false</tt>
-     *        otherwise (don't care)
+     * required PEs are free. If the resource does not have enough PEs to run
+     * the gridlet, gridlet is returned as FAILED.
+     *
+     * @param gl a Gridlet object that is going to be executed
+     * @param ack an acknowledgement, i.e. <tt>true</tt> if wanted to know
+     * whether this operation is success or not, <tt>false</tt>
+     * otherwise (don't care)
      * @pre gl != null
      * @post $none
      */
@@ -235,7 +279,6 @@ class AdvancedSpaceShared extends AllocPolicy {
         //updateGridletProcessing();
         boolean success = false;
         boolean failure = false;
-        
 
         //System.out.println(gl.getGridletID()+" processing...");
         long time_limit = ((ComplexGridlet) gl).getJobLimit();
@@ -257,7 +300,7 @@ class AdvancedSpaceShared extends AllocPolicy {
         if (gl.getNumPE() > 1) {
             //String userName = GridSim.getEntityName( gl.getUserID() );
             int freePE = this.getNumFreePE();
-            // Do not allow anticipating if there is a gridlet in waiting queue. This can happen
+            // Do not allow anticipating if there is a gridlet in waiting active_scheduling_queue. This can happen
             // when i.e., single PE requiring gridlet arrive and only 1 slot is free at the moment.
             if (numPE <= freePE && gridletQueueList_.size() == 0) {
                 // Start now - Enough free PEs on resource
@@ -272,14 +315,14 @@ class AdvancedSpaceShared extends AllocPolicy {
                     failure = true;
                 }
             }
-        // require only 1 CPU
+            // require only 1 CPU
         } else {
             // if there is an available PE slot, then allocate immediately
 
             if (this.getNumFreePE() > 0 && gridletQueueList_.size() == 0) {
 
                 success = allocatePEtoGridlet(rgl);
-            //System.out.println(rgl.getGridletID()+" is alloc = "+success);
+                //System.out.println(rgl.getGridletID()+" is alloc = "+success);
             }
         }
         // if no available PE then put the ResGridlet into a Queue list
@@ -288,14 +331,14 @@ class AdvancedSpaceShared extends AllocPolicy {
             System.out.println(rgl.getGridletID() + " = Gridlet QUEUED because free:" + this.getNumFreePE() + " while reqested:" + rgl.getNumPE() + " on: " + this.resource_.getResourceName() + " Potential problem +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
             gridletQueueList_.add(rgl);
         }
-        
+
         //System.out.println(rgl.getGridletID()+" >>> "+rgl.getGridlet().getGridletStatusString());
         // sends back an ack if required
         if (ack == true && failure == false) {
             super.sendAck(GridSimTags.GRIDLET_SUBMIT_ACK, true,
                     gl.getGridletID(), gl.getUserID());
         }
-        
+
         // allow next scheduling run
         if (failure == false && success == true) {
             //System.out.println(gl.getGridletID()+": has started, requiring CPUs: "+gl.getNumPE());
@@ -305,8 +348,9 @@ class AdvancedSpaceShared extends AllocPolicy {
 
     /**
      * Finds the status of a specified Gridlet ID.
-     * @param gridletId    a Gridlet ID
-     * @param userId       the user or owner's ID of this Gridlet
+     *
+     * @param gridletId a Gridlet ID
+     * @param userId the user or owner's ID of this Gridlet
      * @return the Gridlet status or <tt>-1</tt> if not found
      * @see gridsim.Gridlet
      * @pre gridletId > 0
@@ -345,28 +389,27 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Cancels a Gridlet running in this entity.
-     * This method will search the execution, queued and paused list.
-     * The User ID is
-     * important as many users might have the same Gridlet ID in the lists.
+     * Cancels a Gridlet running in this entity. This method will search the
+     * execution, queued and paused list. The User ID is important as many users
+     * might have the same Gridlet ID in the lists.
      * <b>NOTE:</b>
      * <ul>
-     *    <li> Before canceling a Gridlet, this method updates all the
-     *         Gridlets in the execution list. If the Gridlet has no more MIs
-     *         to be executed, then it is considered to be <tt>finished</tt>.
-     *         Hence, the Gridlet can't be canceled.
+     * <li> Before canceling a Gridlet, this method updates all the Gridlets in
+     * the execution list. If the Gridlet has no more MIs to be executed, then
+     * it is considered to be <tt>finished</tt>. Hence, the Gridlet can't be
+     * canceled.
      *
-     *    <li> Once a Gridlet has been canceled, it can't be resumed to
-     *         execute again since this method will pass the Gridlet back to
-     *         sender, i.e. the <tt>userId</tt>.
+     * <li> Once a Gridlet has been canceled, it can't be resumed to execute
+     * again since this method will pass the Gridlet back to sender, i.e. the
+     * <tt>userId</tt>.
      *
-     *    <li> If a Gridlet can't be found in both execution and paused list,
-     *         then a <tt>null</tt> Gridlet will be send back to sender,
-     *         i.e. the <tt>userId</tt>.
+     * <li> If a Gridlet can't be found in both execution and paused list, then
+     * a <tt>null</tt> Gridlet will be send back to sender, i.e. the
+     * <tt>userId</tt>.
      * </ul>
      *
-     * @param gridletId    a Gridlet ID
-     * @param userId       the user or owner's ID of this Gridlet
+     * @param gridletId a Gridlet ID
+     * @param userId the user or owner's ID of this Gridlet
      * @pre gridletId > 0
      * @pre userId > 0
      * @post $none
@@ -377,9 +420,9 @@ class AdvancedSpaceShared extends AllocPolicy {
 
         // if the Gridlet is not found
         if (rgl == null) {
-            System.out.println(super.resName_ +
-                    ".SpaceShared.gridletCancel(): Cannot find " +
-                    "Gridlet #" + gridletId + " for User #" + userId);
+            System.out.println(super.resName_
+                    + ".SpaceShared.gridletCancel(): Cannot find "
+                    + "Gridlet #" + gridletId + " for User #" + userId);
 
             super.sendCancelGridlet(GridSimTags.GRIDLET_CANCEL, null,
                     gridletId, userId);
@@ -398,14 +441,15 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Pauses a Gridlet only if it is currently executing.
-     * This method will search in the execution list. The User ID is
-     * important as many users might have the same Gridlet ID in the lists.
-     * @param gridletId    a Gridlet ID
-     * @param userId       the user or owner's ID of this Gridlet
-     * @param   ack   an acknowledgement, i.e. <tt>true</tt> if wanted to know
-     *        whether this operation is success or not, <tt>false</tt>
-     *        otherwise (don't care)
+     * Pauses a Gridlet only if it is currently executing. This method will
+     * search in the execution list. The User ID is important as many users
+     * might have the same Gridlet ID in the lists.
+     *
+     * @param gridletId a Gridlet ID
+     * @param userId the user or owner's ID of this Gridlet
+     * @param ack an acknowledgement, i.e. <tt>true</tt> if wanted to know
+     * whether this operation is success or not, <tt>false</tt>
+     * otherwise (don't care)
      * @pre gridletId > 0
      * @pre userId > 0
      * @post $none
@@ -454,11 +498,11 @@ class AdvancedSpaceShared extends AllocPolicy {
             gridletPausedList_.add(rgl);            // add into the paused list
         } // if not found anywhere in both exec and paused lists
         else if (found == -1) {
-            System.out.println(super.resName_ +
-                    ".SpaceShared.gridletPause(): Error - cannot " +
-                    "find Gridlet #" + gridletId + " for User #" + userId);
+            System.out.println(super.resName_
+                    + ".SpaceShared.gridletPause(): Error - cannot "
+                    + "find Gridlet #" + gridletId + " for User #" + userId);
         }
-        
+
         System.out.println(super.resName_ + ".SpaceShared.gridletPause(): Gridlet was paused!!! ");
 
         // sends back an ack if required
@@ -469,21 +513,20 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Moves a Gridlet from this GridResource entity to a different one.
-     * This method will search in both the execution and paused list.
-     * The User ID is important as many Users might have the same Gridlet ID
-     * in the lists.
+     * Moves a Gridlet from this GridResource entity to a different one. This
+     * method will search in both the execution and paused list. The User ID is
+     * important as many Users might have the same Gridlet ID in the lists.
      * <p>
-     * If a Gridlet has finished beforehand, then this method will send back
-     * the Gridlet to sender, i.e. the <tt>userId</tt> and sets the
-     * acknowledgment to false (if required).
+     * If a Gridlet has finished beforehand, then this method will send back the
+     * Gridlet to sender, i.e. the <tt>userId</tt> and sets the acknowledgment
+     * to false (if required).
      *
-     * @param gridletId    a Gridlet ID
-     * @param userId       the user or owner's ID of this Gridlet
-     * @param destId       a new destination GridResource ID for this Gridlet
-     * @param   ack   an acknowledgement, i.e. <tt>true</tt> if wanted to know
-     *        whether this operation is success or not, <tt>false</tt>
-     *        otherwise (don't care)
+     * @param gridletId a Gridlet ID
+     * @param userId the user or owner's ID of this Gridlet
+     * @param destId a new destination GridResource ID for this Gridlet
+     * @param ack an acknowledgement, i.e. <tt>true</tt> if wanted to know
+     * whether this operation is success or not, <tt>false</tt>
+     * otherwise (don't care)
      * @pre gridletId > 0
      * @pre userId > 0
      * @pre destId > 0
@@ -495,9 +538,9 @@ class AdvancedSpaceShared extends AllocPolicy {
 
         // if the Gridlet is not found
         if (rgl == null) {
-            System.out.println(super.resName_ +
-                    ".SpaceShared.gridletMove(): Cannot find " +
-                    "Gridlet #" + gridletId + " for User #" + userId);
+            System.out.println(super.resName_
+                    + ".SpaceShared.gridletMove(): Cannot find "
+                    + "Gridlet #" + gridletId + " for User #" + userId);
 
             if (ack == true) // sends back an ack if required
             {
@@ -533,14 +576,14 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Resumes a Gridlet only in the paused list.
-     * The User ID is important as many Users might have the same Gridlet ID
-     * in the lists.
-     * @param gridletId    a Gridlet ID
-     * @param userId       the user or owner's ID of this Gridlet
-     * @param   ack   an acknowledgement, i.e. <tt>true</tt> if wanted to know
-     *        whether this operation is success or not, <tt>false</tt>
-     *        otherwise (don't care)
+     * Resumes a Gridlet only in the paused list. The User ID is important as
+     * many Users might have the same Gridlet ID in the lists.
+     *
+     * @param gridletId a Gridlet ID
+     * @param userId the user or owner's ID of this Gridlet
+     * @param ack an acknowledgement, i.e. <tt>true</tt> if wanted to know
+     * whether this operation is success or not, <tt>false</tt>
+     * otherwise (don't care)
      * @pre gridletId > 0
      * @pre userId > 0
      * @post $none
@@ -571,13 +614,13 @@ class AdvancedSpaceShared extends AllocPolicy {
                 gridletQueueList_.add(rgl);
             }
 
-            System.out.println(super.resName_ + "TimeShared.gridletResume():" +
-                    " Gridlet #" + gridletId + " with User ID #" +
-                    userId + " has been sucessfully RESUMED.");
+            System.out.println(super.resName_ + "TimeShared.gridletResume():"
+                    + " Gridlet #" + gridletId + " with User ID #"
+                    + userId + " has been sucessfully RESUMED.");
         } else {
-            System.out.println(super.resName_ +
-                    "TimeShared.gridletResume(): Cannot find " +
-                    "Gridlet #" + gridletId + " for User #" + userId);
+            System.out.println(super.resName_
+                    + "TimeShared.gridletResume(): Cannot find "
+                    + "Gridlet #" + gridletId + " for User #" + userId);
         }
 
         // sends back an ack if required
@@ -586,12 +629,14 @@ class AdvancedSpaceShared extends AllocPolicy {
                     gridletId, userId);
         }
     }
+
     ///////////////////////////// PRIVATE METHODS /////////////////////
     /**
      * Allocates the first Gridlet in the Queue list (if any) to execution list
      * If there are more gridlets that can be allocated then allocate them. This
-     * is usually possible when previously finished gridlet required more PEs (CPUs)
-     * while queued gridlets require less.
+     * is usually possible when previously finished gridlet required more PEs
+     * (CPUs) while queued gridlets require less.
+     *
      * @pre $none
      * @post $none
      */
@@ -610,8 +655,7 @@ class AdvancedSpaceShared extends AllocPolicy {
                 ResGridlet obj = (ResGridlet) gridletQueueList_.getFirst();
 
                 // allocate the Gridlet into an empty PE slot and remove it from
-                // the queue list
-
+                // the active_scheduling_queue list
                 if (obj.getNumPE() > 1) {
                     if (resource_.getNumFreePE() >= obj.getNumPE()) {
                         // Do not even try to allocate if not enough PEs free
@@ -629,10 +673,11 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Updates the execution of all Gridlets for a period of time.
-     * The time period is determined from the last update time up to the
-     * current time. Once this operation is successfull, then the last update
-     * time refers to the current time.
+     * Updates the execution of all Gridlets for a period of time. The time
+     * period is determined from the last update time up to the current time.
+     * Once this operation is successfull, then the last update time refers to
+     * the current time.
+     *
      * @pre $none
      * @post $none
      */
@@ -683,12 +728,12 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Identifies MI share (max and min) each Gridlet gets for
-     * a given timeSpan
-     * @param timeSpan     duration
-     * @param machineId    machine ID that executes this Gridlet
-     * @return  the total MI share that a Gridlet gets for a given
-     *          <tt>timeSpan</tt>
+     * Identifies MI share (max and min) each Gridlet gets for a given timeSpan
+     *
+     * @param timeSpan duration
+     * @param machineId machine ID that executes this Gridlet
+     * @return the total MI share that a Gridlet gets for a given
+     * <tt>timeSpan</tt>
      * @pre timeSpan >= 0.0
      * @pre machineId > 0
      * @post $result >= 0.0
@@ -707,9 +752,10 @@ class AdvancedSpaceShared extends AllocPolicy {
     /**
      * Allocates a Gridlet into a free PE and sets the Gridlet status into
      * INEXEC and PE status into busy afterwards
-     * @param rgl  a ResGridlet object
+     *
+     * @param rgl a ResGridlet object
      * @return <tt>true</tt> if there is an empty PE to process this Gridlet,
-     *         <tt>false</tt> otherwise
+     * <tt>false</tt> otherwise
      * @pre rgl != null
      * @post $none
      */
@@ -763,7 +809,6 @@ class AdvancedSpaceShared extends AllocPolicy {
         int roundUpTime = (int) (time + 1);   // rounding up
         rgl.setFinishTime(time);
 
-
         //update machine usage
         Scheduler.load += (Scheduler.activePEs / Scheduler.availPEs) * (GridSim.clock() - Scheduler.last_event);
         Scheduler.classic_load += (Scheduler.classic_activePEs / Scheduler.classic_availPEs) * (GridSim.clock() - Scheduler.last_event);
@@ -774,19 +819,19 @@ class AdvancedSpaceShared extends AllocPolicy {
 
         // then send this into itself
         //super.sim_schedule(super.myId_, time, GridSimTags.INSIGNIFICANT);
-        
         super.sim_schedule(super.myId_, time, GridSimTags.INSIGNIFICANT, rgl);
 
         return true;
     }
 
     /**
-     * Allocates a Gridlet requiring multiple PEs into a free PEs and sets the Gridlet status into
-     * INEXEC and PEs status into busy afterwards.
-     * @param rgl  a ResGridlet object
-     * @param numPE  number of PEs required by gridlet
+     * Allocates a Gridlet requiring multiple PEs into a free PEs and sets the
+     * Gridlet status into INEXEC and PEs status into busy afterwards.
+     *
+     * @param rgl a ResGridlet object
+     * @param numPE number of PEs required by gridlet
      * @return <tt>true</tt> if there are empty PEs to process this Gridlet,
-     *         <tt>false</tt> otherwise
+     * <tt>false</tt> otherwise
      * @pre rgl != null
      * @post $none
      */
@@ -838,10 +883,8 @@ class AdvancedSpaceShared extends AllocPolicy {
         // add this Gridlet into execution list
         gridletInExecList_.add(rgl);
 
-
         // Identify Completion Time and Set Interrupt
         int ids[] = rgl.getListMachineID();
-
 
         // Not needed when all machines have same PE rating - just for future developement
         int rating = Integer.MAX_VALUE;
@@ -878,8 +921,9 @@ class AdvancedSpaceShared extends AllocPolicy {
     /**
      * Forecast finish time of a Gridlet.
      * <tt>Finish time = length / available rating</tt>
-     * @param availableRating   the shared MIPS rating for all Gridlets
-     * @param length   remaining Gridlet length
+     *
+     * @param availableRating the shared MIPS rating for all Gridlets
+     * @param length remaining Gridlet length
      * @return Gridlet's finish time.
      * @pre availableRating >= 0.0
      * @pre length >= 0.0
@@ -901,6 +945,7 @@ class AdvancedSpaceShared extends AllocPolicy {
     /**
      * Checks all Gridlets in the execution list whether they are finished or
      * not.
+     *
      * @pre $none
      * @post $none
      */
@@ -938,10 +983,11 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Updates the Gridlet's properties, such as status once a
-     * Gridlet is considered finished.
-     * @param rgl   a ResGridlet object
-     * @param status   the Gridlet status
+     * Updates the Gridlet's properties, such as status once a Gridlet is
+     * considered finished.
+     *
+     * @param rgl a ResGridlet object
+     * @param status the Gridlet status
      * @pre rgl != null
      * @pre status >= 0
      * @post $none
@@ -965,7 +1011,7 @@ class AdvancedSpaceShared extends AllocPolicy {
         // due to timing issues in ResGridlet class
         rgl.setGridletStatus(status);
         rgl.finalizeGridlet();
-        if (status == Gridlet.FAILED_RESOURCE_UNAVAILABLE) {
+        if (status == Gridlet.FAILED_RESOURCE_UNAVAILABLE || status == Gridlet.PAUSED) {
 
             double wall = GridSim.clock() - rgl.getGridletArrivalTime();
             double actual = GridSim.clock() - rgl.getExecStartTime();
@@ -979,7 +1025,6 @@ class AdvancedSpaceShared extends AllocPolicy {
         Scheduler.load += (Scheduler.activePEs / Scheduler.availPEs) * (GridSim.clock() - Scheduler.last_event);
         Scheduler.classic_load += (Scheduler.classic_activePEs / Scheduler.classic_availPEs) * (GridSim.clock() - Scheduler.last_event);
         Scheduler.max_load += 1.0 * (GridSim.clock() - Scheduler.last_event);
-
 
         Scheduler.last_event = GridSim.clock();
         Scheduler.activePEs -= rgl.getNumPE() * super.resource_.getMIPSRatingOfOnePE();
@@ -996,12 +1041,13 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Handles an operation of canceling a Gridlet in either execution list
-     * or paused list.
-     * @param gridletId    a Gridlet ID
-     * @param userId       the user or owner's ID of this Gridlet
+     * Handles an operation of canceling a Gridlet in either execution list or
+     * paused list.
+     *
+     * @param gridletId a Gridlet ID
+     * @param userId the user or owner's ID of this Gridlet
      * @param an object of ResGridlet or <tt>null</tt> if this Gridlet is not
-     *        found
+     * found
      * @pre gridletId > 0
      * @pre userId > 0
      * @post $none
@@ -1054,8 +1100,8 @@ class AdvancedSpaceShared extends AllocPolicy {
 
     public void processOtherEvent(Sim_event ev) {
         if (ev == null) {
-            System.out.println(resName_ + ".processOtherEvent(): " +
-                    "Error - an event is null.");
+            System.out.println(resName_ + ".processOtherEvent(): "
+                    + "Error - an event is null.");
             return;
         }
         if (ev.get_tag() == AleaSimTags.FAILURE_MACHINE) {
@@ -1072,7 +1118,7 @@ class AdvancedSpaceShared extends AllocPolicy {
             double now = GridSim.clock();
             if (last_time == now) {
                 killed_cpus += ids.length;
-            // do nothing, internal event has already been sent to inform the Scheduler
+                // do nothing, internal event has already been sent to inform the Scheduler
             } else {
                 killed_cpus = ids.length;
                 last_time = now;
@@ -1093,6 +1139,20 @@ class AdvancedSpaceShared extends AllocPolicy {
             super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.FAILURE_START, this.resId_);
             super.sim_schedule(super.myId_, duration, AleaSimTags.FAILURE_FINISHED);
 
+        } else if (ev.get_tag() == AleaSimTags.POLICY_CHECKPOINT) {
+            LinkedList<GridletInfo> checkpointed_jobs = (LinkedList<GridletInfo>) ev.get_data();
+
+            //send those jobs as completed back to Scheduler
+            for (int i = 0; i < checkpointed_jobs.size(); i++) {
+                ComplexGridlet cg = checkpointed_jobs.get(i).getGridlet();
+                for (int j = 0; j < gridletInExecList_.size(); j++) {
+                    ResGridlet rgl = (ResGridlet) gridletInExecList_.get(j);
+                    if (rgl.getGridlet().equals(cg)) {
+                        endCheckpointedGridlet(rgl);
+                        break;
+                    }
+                }
+            }
         } else {
             System.out.println("Unknown tag: " + ev.get_tag());
         }
@@ -1137,13 +1197,9 @@ class AdvancedSpaceShared extends AllocPolicy {
         int one = total / mach;
         int runningPE = total - (one * failedm);
 
-
-
-
-
-    //System.out.println(Math.round(GridSim.clock())+": failure of: "+resName_ +" killed: "+ids.length+" machines. ["+ids[0]+"](x2), running: "+getNumRunning()+"/"+this.resource_.getNumPE()+" dur:"+duration);
-    //System.out.println(Math.round(GridSim.clock())+": "+resName_ +": killing machines="+idss+" killed jobs="+killed+" remaining jobs="+ gridletInExecList_.size()+ 
-    //        " requesting="+req+" PEs, failed machines pre/post/total="+prev+"/"+resource_.getNumFailedMachines()+"/"+resource_.getNumMachines()+" avail/allPEs="+freePE+"/"+total);        
+        //System.out.println(Math.round(GridSim.clock())+": failure of: "+resName_ +" killed: "+ids.length+" machines. ["+ids[0]+"](x2), running: "+getNumRunning()+"/"+this.resource_.getNumPE()+" dur:"+duration);
+        //System.out.println(Math.round(GridSim.clock())+": "+resName_ +": killing machines="+idss+" killed jobs="+killed+" remaining jobs="+ gridletInExecList_.size()+ 
+        //        " requesting="+req+" PEs, failed machines pre/post/total="+prev+"/"+resource_.getNumFailedMachines()+"/"+resource_.getNumMachines()+" avail/allPEs="+freePE+"/"+total);        
     }
 
     private int getNumRunning() {
@@ -1179,7 +1235,6 @@ class AdvancedSpaceShared extends AllocPolicy {
                 machIDs = new int[1];
                 machIDs[0] = rgl.getMachineID();
             }
-
 
             // only fail gridlets allocated to the machines which have failed
             for (int j = 0; j < machIDs.length; j++) {

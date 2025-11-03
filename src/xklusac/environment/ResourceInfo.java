@@ -1,5 +1,6 @@
 package xklusac.environment;
 
+import alea.core.AleaSimTags;
 import gridsim.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,8 +8,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import static xklusac.environment.ExperimentSetup.pin_duration;
+import org.jfree.data.time.TimeSeries;
 import xklusac.extensions.BinaryHeap;
+import xklusac.extensions.FairshareGroup;
 import xklusac.extensions.HeapNode;
 import xklusac.extensions.Hole;
 import xklusac.extensions.StartComparator;
@@ -18,8 +20,8 @@ import xklusac.extensions.StartComparator;
  * This class stores dynamic information about each resource. E.g., prepared
  * schedule for this resource, list of gridletDescriptions of jobs in
  * execution/waiting on machine. It also provides methods to calculate various
- * parameters based on the knowledge of the schedule/queue and resource status,
- * e.g. expected makespan, machine usage, first free slot, etc.
+ * parameters based on the knowledge of the schedule/active_scheduling_queue and
+ * resource status, e.g. expected makespan, machine usage, first free slot, etc.
  *
  * @author Dalibor Klusacek
  */
@@ -88,7 +90,7 @@ public class ResourceInfo {
      */
     public double finishTimeOnPE[] = null;
     /**
-     * earliest start time (queue only)
+     * earliest start time (active_scheduling_queue only)
      */
     public double est = Double.MAX_VALUE - 10;
     public int usablePEs = 0;
@@ -137,6 +139,8 @@ public class ResourceInfo {
 
     public int nowFreePE = 0;
     public double first_job_start = -1;
+    TimeSeries series_usage;
+    TimeSeries series_used;
 
     /**
      * Creates a new instance of ResourceInfo with "in schedule" and "on
@@ -172,6 +176,8 @@ public class ResourceInfo {
                 }
             }
         }
+        series_usage = new TimeSeries(resource.getResourceName());
+        series_used = new TimeSeries(resource.getResourceName());
 
     }
 
@@ -197,7 +203,7 @@ public class ResourceInfo {
             }
         }
         if (!removed) {
-            System.out.println("Error removing gi from InExec list.");
+            System.out.println("Error removing gi: " + id + " from InExec list.");
         }
     }
 
@@ -218,23 +224,23 @@ public class ResourceInfo {
             }
         }
     }
-    
-    
-    public String printNodeStatus(){
+
+    public String printNodeStatus() {
         String s = "";
         MachineList machines = this.resource.getMachineList();
-        
 
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
-            s += "["+machine.getNumFreePE()+","+machine.getFreeGPUs()+"]";
-        }     
-        
+            s += "[" + machine.getNumFreePE() + "," + machine.getFreeGPUs() + "]";
+        }
+
         return s;
     }
 
     /**
      * Gets the number of currently free CPUs on a resource.
+     *
+     * @return number of currently free CPUs
      */
     public int getNumFreePE() {
         if (stable_free) {
@@ -299,10 +305,35 @@ public class ResourceInfo {
      */
     public boolean canExecuteNow(GridletInfo gi) {
         boolean excl = gi.getProperties().contains("excl");
-        if (ExperimentSetup.use_queues) {
-            int avail = ExperimentSetup.queues.get(gi.getQueue()).getAvailCPUs();
+
+        if (ExperimentSetup.use_multiple_queues) {
+            int avail = ExperimentSetup.queues.get(gi.getQueue()).getQueueAvailCPUs();
             if (avail < gi.getNumPE()) {
+                gi.setCheckpoint_limit_eligible(false);
+                //System.out.println(gi.getID()+": Queue limit FAIL: "+avail+" avail CPUs of limit: "+ExperimentSetup.queues.get(gi.getQueue()).getQueue_CPU_limit()+" for job requiring="+gi.getNumPE()+" CPUs");
                 return false;
+            } else {
+                gi.setCheckpoint_limit_eligible(true);
+                //System.out.println(gi.getID()+": Queue limit OK: "+avail+" avail CPUs of limit: "+ExperimentSetup.queues.get(gi.getQueue()).getQueue_CPU_limit()+" for job requiring="+gi.getNumPE()+" CPUs");
+            }
+        }
+
+        if (ExperimentSetup.use_user_groups) {
+            FairshareGroup g = ExperimentSetup.groups.get(gi.getGroupID());
+            User u = ExperimentSetup.users.get(gi.getUser());
+            int avail = g.getFreeQuota();
+            int user_avail = u.getFreeQuota();
+            if (avail < gi.getNumPE()) {
+                gi.setCheckpoint_limit_eligible(false);
+                //System.out.println(gi.getID()+": Quota limit FAIL: only "+avail+" CPUs available of total limit: "+g.getQuota()+" for group "+g.getName()+", for job requiring="+gi.getNumPE()+" CPUs");
+                return false;
+            } else if (user_avail < gi.getNumPE()) {
+                gi.setCheckpoint_limit_eligible(false);
+                //System.out.println(gi.getID() + " User Quota FAIL: only =" + user_avail + " (of "+u.getUserQuota()+" total) < requested=" + gi.getNumPE() + " for user " + u.getName());
+                return false;
+            } else {
+                gi.setCheckpoint_limit_eligible(true);
+                //System.out.println(gi.getID()+": Quota limit OK: "+avail+" CPUs available of total limit: "+g.getQuota()+" for group "+g.getName()+", for job requiring="+gi.getNumPE()+" CPUs");
             }
         }
 
@@ -368,7 +399,7 @@ public class ResourceInfo {
                 continue;
             }
             if (ExperimentSetup.anti_starvation == false) {
-                if (machine.getNumFreePE() >= ppn && machine.getFreeRam() >= ram && machine.getFreeGPUs()>= GPUs_per_node) {
+                if (machine.getNumFreePE() >= ppn && machine.getFreeRam() >= ram && machine.getFreeGPUs() >= GPUs_per_node) {
                     allocateNodes--;
                     //System.out.println(gi.getID() + " nodes="+numNodes+" ncpus="+ppn+" to_be_allocated_nodes="+allocateNodes);
                 } else {
@@ -513,7 +544,7 @@ public class ResourceInfo {
             // rezervaci udelam na kazdem vyhovujicim stroji
             for (int i = 0; i < machines.size(); i++) {
                 MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
-                if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus()>= gpus) {
+                if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus() >= gpus) {
                     machine.setNumFreeVirtualPE(machine.getNumFreeVirtualPE() - ppn);
                     machine.setUsedRam(machine.getUsedRam() + ram);
                     machine.setUsed_gpus(machine.getUsed_gpus() + gpus);
@@ -539,7 +570,7 @@ public class ResourceInfo {
             MachineWithRAMandGPUs earliest_machine = null;
             for (int i = 0; i < machines.size(); i++) {
                 MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
-                if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus()>= gpus) {
+                if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus() >= gpus) {
                     double local_est = machine.getEarliestStartTimeForNodeJob(ppn);
                     if (local_est < earliest_start_time) {
                         earliest_start_time = local_est;
@@ -578,7 +609,7 @@ public class ResourceInfo {
             // rezervaci udelam na kazdem vyhovujicim stroji maximalne tolikrat kolik je max_overhead
             for (int i = 0; i < machines.size(); i++) {
                 MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
-                if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus()>= gpus) {
+                if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus() >= gpus) {
                     machine.setNumFreeVirtualPE(machine.getNumFreeVirtualPE() - ppn);
                     machine.setUsedRam(machine.getUsedRam() + ram);
                     machine.setUsed_gpus(machine.getUsed_gpus() + gpus);
@@ -641,19 +672,19 @@ public class ResourceInfo {
 
     public boolean canExecuteEver(GridletInfo gi) {
 
-        if (Scheduler.use_job_special_requests == false && ExperimentSetup.use_RAM == false) {
+        if (ExperimentSetup.enforce_partition == false && ExperimentSetup.use_RAM == false) {
 
             if (this.getNumRunningPE() >= gi.getNumPE()) {
                 //System.out.println(gi.getID() + " can run here at " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " >= " + gi.getNumPE());
                 return true;
             } else {
-                System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());
+                //System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());
                 return false;
             }
 
         }
 
-        if (Scheduler.use_job_special_requests == false && ExperimentSetup.use_RAM == true) {
+        if (ExperimentSetup.enforce_partition == false && ExperimentSetup.use_RAM == true) {
             long ram = gi.getRam();
             int ppn = gi.getPpn();
             int numNodes = gi.getNumNodes();
@@ -680,50 +711,13 @@ public class ResourceInfo {
             return false;
         }
 
-        // zakaz spousteni uloh na clusteru, co nevyhovuje nodespecu
-        if (gi.getQueue().equals("uv")) {
-            if (!this.resource.getResourceName().contains("ungu") && !this.resource.getResourceName().contains("urga")) {
-                System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because queue=" + gi.getQueue());
-                return false;
-            }
-        }
-        if (gi.getQueue().equals("phi")) {
-            if (!this.resource.getResourceName().contains("phi")) {
-                System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because queue=" + gi.getQueue());
-                return false;
-            }
-        }
-        // don't allow jobs running on ungu and urga unless they are from queue "uv"
-        if ((this.resource.getResourceName().contains("ungu") || this.resource.getResourceName().contains("urga")) && !gi.getQueue().equals("uv")) {
-            System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because queue=" + gi.getQueue());
-            return false;
-        }
-        // don't allow jobs running on phi unless they are from queue "phi"
-        if (this.resource.getResourceName().contains("phi") && !gi.getQueue().equals("phi")) {
-            System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because queue=" + gi.getQueue());
-            return false;
-        }
-
         String[] req_nodes = gi.getProperties().split(":");
 
         // returns false if this resource partition is not the one required by job in SWF
-        if (req_nodes.length == 1 && !(gi.getProperties()).contains(":") && ExperimentSetup.enforce_partition) {
+        if (req_nodes.length == 1 && gi.getProperties().length() > 0 && !gi.getProperties().contains(":") && ExperimentSetup.enforce_partition && !gi.getProperties().contains("all")) {
             String partition = this.resource.getProperties();
             if (!partition.equals(req_nodes[0])) {
-                System.out.println(gi.getID() + " requires partition: " + gi.getProperties() + ", but this resource partition is: " + partition);
-                return false;
-            }
-        }
-
-        for (int r = 0; r < req_nodes.length; r++) {
-            // negativni vlastnost
-            if ((req_nodes[r].contains("^cl_") || req_nodes[r].contains("=False") || req_nodes[r].contains("=false") || req_nodes[r].contains("=0")) && req_nodes[r].contains(this.resource.getResourceName())) {
-                System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because prop=" + req_nodes[r]);
-                return false;
-            }
-            //pozitivni vlastnost
-            if (!(req_nodes[r].contains("=0") && req_nodes[r].contains("cl_")) && !req_nodes[r].contains("=false") && !req_nodes[r].contains("=False") && !req_nodes[r].contains("^") && req_nodes[r].contains("cl_") && !req_nodes[r].contains(this.resource.getResourceName().substring(0, Math.min(this.resource.getResourceName().length(), 5)))) {
-                System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because positive prop=" + req_nodes[r]);
+                //System.out.println(gi.getID() + " requires partition: " + gi.getProperties() + ", but this resource partition is: " + partition+" (cluster = "+this.resource.getResourceName()+")");
                 return false;
             }
         }
@@ -732,7 +726,7 @@ public class ResourceInfo {
             if (this.getNumRunningPE() >= gi.getNumPE()) {
                 return true;
             } else {
-                System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());
+                //System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());
                 return false;
             }
         }
@@ -2351,6 +2345,29 @@ public class ResourceInfo {
 
     }
 
+    public LinkedList<GridletInfo> findAndCheckpointJobs(GridletInfo gi, int priority_level) {
+        int required = Math.max(0, (gi.getNumPE() - getNumFreePE()));
+        int freed = 0;
+        LinkedList<GridletInfo> checkpointed_jobs = new LinkedList<>();
+        for (int i = resInExec.size() - 1; i >= 0; i--) {
+            GridletInfo ge = resInExec.get(i);
+            int ge_p = ExperimentSetup.queues.get(ge.getQueue()).getPriority();
+            if (ge_p < priority_level) {
+                freed += ge.getNumPE();
+                checkpointed_jobs.add(ge);
+                if (freed >= required) {
+                    //kill such job at AdvSpaceShared
+                    //super.sim_schedule(this.resource.getResourceID(), 0.0, AleaSimTags.POLICY_CHECKPOINT, null);
+                    return checkpointed_jobs;
+                }
+            } else {
+                //System.out.println(ge.getID() + " has " + ge_p + " priority thus cannot be checkpointed with a job having priority " + priority_level);
+            }
+        }
+        //System.out.println(gi.getID() + " could not use C/R, only "+freed+" found ");   
+        return null;
+    }
+
     /**
      * This method force recomputation of jobs-on-resource status. It also
      * updates information about their expected finish time, tardiness etc.
@@ -2372,9 +2389,9 @@ public class ResourceInfo {
         //System.out.println(gi.getNumPE() + " CPUs required for gi :" + gi.getID());
         int index = findFirstFreeSlot(finishTimeOnPE, gi);
         for (int j = 0; j < finishTimeOnPE.length; j++) {
-            //System.out.println(j+":"+finishTimeOnPE[j]);
+            //  System.out.println(j+":"+finishTimeOnPE[j]);
         }
-        this.est = finishTimeOnPE[index]; // Earl. Start Time for head of queue
+        this.est = finishTimeOnPE[index]; // Earl. Start Time for head of active_scheduling_queue
         this.usablePEs = findUsablePEs(index, finishTimeOnPE, gi);
         //System.out.println(gi.getNumPE() + " CPUs required and found " + usablePEs + " for gi :" + gi.getID()+" min time = "+this.est);
         //System.out.println("===========================================================");

@@ -81,6 +81,7 @@ public class ComplexGridlet extends Gridlet {
      * queue name where the job was submitted in
      */
     private String queue;
+    private int queueID;
     private String properties;
     private boolean repeated;
     private String user = "";
@@ -101,7 +102,6 @@ public class ComplexGridlet extends Gridlet {
     private String onJobFail = null;
     private double underestimated_by = 0.0;
     private int prolonged = 0;
-    
 
     public String getOnJobStart() {
         return onJobStart;
@@ -110,7 +110,7 @@ public class ComplexGridlet extends Gridlet {
     public String getOnJobCompl() {
         return onJobCompl;
     }
-    
+
     public String getOnJobFail() {
         return onJobFail;
     }
@@ -122,17 +122,21 @@ public class ComplexGridlet extends Gridlet {
     public void setOnJobCompl(String agent) {
         onJobCompl = agent;
     }
-    
+
     public void setOnJobFail(String agent) {
         onJobFail = agent;
     }
-    
+
     private double last_alloc_time = -1.0;
     private double last_node_time = -1.0;
-    
+
     private ArrayList<Integer> precedingJobs = null;
-    
+
     private int gpus_per_node = 0;
+
+    private int groupID = 0;
+    
+    private boolean preempted = true;
 
     /**
      * Creates a new instance of ComplexGridlet representing one Job
@@ -153,8 +157,8 @@ public class ComplexGridlet extends Gridlet {
      */
     public ComplexGridlet(int gridletID, String user, long job_limit, double gridletLength, double estimatedLength, long gridletFileSize,
             long gridletOutputSize, String oSrequired, String archRequired,
-            double arrival_time, double due_date, int priority, int numPE, double estMach, String queue, String properties, 
-            double percentage, long ram, int numNodes, int ppn, int gpus, ArrayList precedingJobs) {
+            double arrival_time, double due_date, int priority, int numPE, double estMach, int queue, String properties,
+            double percentage, long ram, int numNodes, int ppn, int gpus, ArrayList precedingJobs, int groupID) {
         // call Gridlet constructor
         super(gridletID, gridletLength, gridletFileSize, gridletOutputSize);
         this.setOpSystemRequired(oSrequired);
@@ -166,7 +170,13 @@ public class ComplexGridlet extends Gridlet {
         this.setNumPE(numPE);
         this.setEstimatedLength(estimatedLength);
         this.setEstimatedMachine(estMach);
-        this.setQueue(queue);
+        // gets the name of the Queue (if queue names are used)
+        if (ExperimentSetup.use_multiple_queues) {
+            this.setQueue(ExperimentSetup.queues_id_to_name_mapping.get(queue));
+        } else {
+            this.setQueue("" + queue);
+        }
+        this.setQueueID(queue);
         this.setRepeated(false);
         this.setProperties(properties);
         this.setUser(user);
@@ -177,7 +187,7 @@ public class ComplexGridlet extends Gridlet {
         this.setPpn(ppn);
         this.setNumNodes(numNodes);
         this.setPredicted_runtime(-1.0);
-        this.setPredicted_wait(-1.0);       
+        this.setPredicted_wait(-1.0);
         this.setLast_alloc_time(-1.0);
         this.setLast_node_time(-1.0);
         this.setBackfilled(0);
@@ -186,6 +196,8 @@ public class ComplexGridlet extends Gridlet {
         this.setProlonged(0);
         this.setGpus_per_node(gpus);
         this.setPrecedingJobs(precedingJobs);
+        this.setGroupID(groupID);
+        this.setPreempted(false);
     }
 
     /**
@@ -345,6 +357,7 @@ public class ComplexGridlet extends Gridlet {
     public void setPEs(ArrayList<Integer> PEs) {
         this.PEs = PEs;
     }
+
     public String getPlannedPEsString() {
         String pes = "";
         for (int i = 0; i < PEs.size(); i++) {
@@ -435,7 +448,7 @@ public class ComplexGridlet extends Gridlet {
      * @param backfilled the backfilled to set
      */
     public void setBackfilled(int backfilled) {
-        this.backfilled = backfilled;
+        this.backfilled += backfilled;
     }
 
     /**
@@ -534,6 +547,48 @@ public class ComplexGridlet extends Gridlet {
      */
     public void setGpus_per_node(int gpus_per_node) {
         this.gpus_per_node = gpus_per_node;
+    }
+
+    /**
+     * @return the groupID
+     */
+    public int getGroupID() {
+        return groupID;
+    }
+
+    /**
+     * @param groupID the groupID to set
+     */
+    public void setGroupID(int groupID) {
+        this.groupID = groupID;
+    }
+
+    /**
+     * @return the queueID
+     */
+    public int getQueueID() {
+        return queueID;
+    }
+
+    /**
+     * @param queueID the queueID to set
+     */
+    public void setQueueID(int queueID) {
+        this.queueID = queueID;
+    }
+
+    /**
+     * @return the preempted
+     */
+    public boolean isPreempted() {
+        return preempted;
+    }
+
+    /**
+     * @param preempted the preempted to set
+     */
+    public void setPreempted(boolean preempted) {
+        this.preempted = preempted;
     }
 
 }
