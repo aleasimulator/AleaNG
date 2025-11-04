@@ -22,16 +22,16 @@ On Linux-like systems, extract the downloaded zip folder and run the following c
 mkdir -p out
 javac -encoding UTF-8 -cp "lib/simjava.jar:lib/gridsim.jar:lib/*" -d out $(find src -name "*.java")
 ```
-The `mkdir -p out` will create `./out` folder for the compiled bytecode. Next, `javac...` command will compile all java classes of AleaNG using the modified `simjava.jar` and `gridsim.jar` libraries (<font color=green>their ordering is important, so keep it this way</font>).
+The `mkdir -p out` will create `./out` folder for the compiled bytecode. Next, `javac...` command will compile all java classes of AleaNG using the modified `simjava.jar` and `gridsim.jar` libraries (**their ordering is important, so keep it this way**).
 
 ### Compilation on Windows systems
-On Linux-like systems, extract the downloaded zip folder and run following commands (in **PowerShell** `powershell.exe`):
+On Linux-like systems, extract the downloaded zip folder and run following commands (in **PowerShell**: `powershell.exe`):
 ```
 mkdir out
 $files = Get-ChildItem -Recurse -Filter *.java src | ForEach-Object { $_.FullName }
 javac -d out -cp "lib\simjava.jar;lib\gridsim.jar;lib\*;." $files
 ```
-It is important to <font color=green>run these commands in PowerShell</font>, since the standard `cmd.exe` uses a different syntax. 
+It is important to **run these commands in PowerShell**, since the standard `cmd.exe` uses a different syntax. 
 
 ### Running AleaNG on Linux systems
 On Linux-like systems, navigate to the folder where you have AleaNG (and the newly created `./out` folder) and execute following command (i.e., call java with the correct classpath and your main class `ExperimentSetup`):
@@ -76,7 +76,7 @@ AleaNG will read all 1943 jobs from workload file.
 ```
 
 ## Simulation Setup
-AleaNG will read `configuration.properties` file to setup the simulation. By default, it will read **Example 1** stored in the `./examples/Example1/` folder. <font color=green>If you want to try Example 2, 3 or Example 4</font>, all you need to do is rewrite the `configuration.properties` file with the one provided in each `./examples/ExampleXY/` directory.
+AleaNG will read `configuration.properties` file to setup the simulation. By default, it reads **Example 1** stored in the `./examples/Example1/` folder. **If you want to try Example 2, 3 or Example 4**, all you need to do is rewrite the `configuration.properties` file with the one provided in each `./examples/ExampleXY/` directory.
 
 Once more familiar, you can **edit the configuration file**, changing the algorithms, workloads and simulation setup according to your needs. Each parameter is explained in the `configuration.properties` file, which looks like this:
 ```ini
@@ -101,15 +101,15 @@ algorithms = 1
 sample_tick=600
 # if true, charts are shown at the end of the experiment
 draw_chart=true
-
+...
 ```
 
 ##### Software licence:
 
-This software is provided as is, free of charge under the terms of the LGPL licence. It uses jFreeChart and itextpdf libraries to generate charts.
+This software is provided as is, free of charge under the terms of the LGPL licence. It uses jFreeChart and itextpdf libraries to generate charts. It is an extension of more general toolkits GridSim and SimJava.
 
 ##### Important
 
 When using AleaNG in your paper or presentation, please use the following citations as an acknowledgement. Thank you!
 
-* Dalibor Klusáček. Fair-Sharing Simulator for Batch Computing Systems. In proceedings of the 15th International Conference on Parallel Processing \& Applied Mathematics (PPAM 2024), Springer, 2024.
+* Dalibor Klusáček and Václav Chlumský. "*Fair-sharing simulator: Toward fair scheduling in batch computing systems*". In The International Journal of High Performance Computing Applications, Sage, 2025. https://doi.org/10.1177/10943420251385673
