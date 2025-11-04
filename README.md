@@ -13,6 +13,9 @@ It allows you to simulate and visualize the behavior of computing clusters.
 * The simulator supports both textual (`csv`) and graphical outputs (`png` and `pdf`).
 * Simulation results are stored in `./results/` directory 
 
+### Documentation
+Documentation can be found in the https://github.com/aleasimulator/AleaNG/blob/master/readme.pdf file. A **quick start guide is shown below**:
+
 ## Compiling and Running AleaNG
 AleaNG is distributed as **Netbeans project**, but can be easily compiled using just standard Java (JDK) package commands. 
 
@@ -43,6 +46,13 @@ To run your program, you just need to call java with the correct classpath and y
 ```
 java -cp "out;lib\simjava.jar;lib\gridsim.jar;lib\*" xklusac.environment.ExperimentSetup
 ```
+### Memory Requirements
+If you plan to run large simulations, make sure to specify enough Java heap space for the JVM. To do so, just add, e.g., ` -Xms1024m -Xmx4096m` to your `java ...` command.
+Example for Linux system:
+```
+java -Xms1024m -Xmx4096m -cp "out:lib/simjava.jar:lib/gridsim.jar:lib/*" xklusac.environment.ExperimentSetup
+```
+
 ### Simulation Start
 If sucessfull, java command shown above will start the AleaNG simulator. AleaNG will read `configuration.properties` file to setup the simulation. By default, it will read **Example 1** stored in the `./examples/Example1/` folder. You should see something like this in the output:
 ```
@@ -106,10 +116,13 @@ draw_chart=true
 
 ##### Software licence:
 
-This software is provided as is, free of charge under the terms of the LGPL licence. It uses jFreeChart and itextpdf libraries to generate charts. It is an extension of more general toolkits GridSim and SimJava.
+This software is provided as is, free of charge under the terms of the LGPL licence. It uses jFreeChart and itextpdf libraries to generate charts. AleaNG is an extension of more general toolkits GridSim and SimJava.
 
 ##### Important
 
-When using AleaNG in your paper or presentation, please use the following citations as an acknowledgement. Thank you!
-
+When using AleaNG in your paper or presentation, please use the following citation as an acknowledgement. 
 * Dalibor Klusáček and Václav Chlumský. "*Fair-sharing simulator: Toward fair scheduling in batch computing systems*". In The International Journal of High Performance Computing Applications, Sage, 2025. https://doi.org/10.1177/10943420251385673
+
+(To acknowledge GridSim and SimJava, please consult their project webpages for proper references: https://clouds.cis.unimelb.edu.au/gridsim/ and https://www.icsa.inf.ed.ac.uk/research/groups/hase/simjava/). Thank you!
+
+
