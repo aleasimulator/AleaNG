@@ -137,6 +137,12 @@ public class ComplexGridlet extends Gridlet {
     private int groupID = 0;
     
     private boolean preempted = true;
+    
+    private boolean is_using_reserved_resource = false;
+    
+    private LinkedList<Integer> allowed_machine_ids = new LinkedList();
+    
+    public String assigned_machines = "";
 
     /**
      * Creates a new instance of ComplexGridlet representing one Job
@@ -198,6 +204,8 @@ public class ComplexGridlet extends Gridlet {
         this.setPrecedingJobs(precedingJobs);
         this.setGroupID(groupID);
         this.setPreempted(false);
+        this.setIs_using_reserved_resource(false);
+        
     }
 
     /**
@@ -589,6 +597,34 @@ public class ComplexGridlet extends Gridlet {
      */
     public void setPreempted(boolean preempted) {
         this.preempted = preempted;
+    }
+
+    /**
+     * @return the is_using_reserved_resource
+     */
+    public boolean isIs_using_reserved_resource() {
+        return is_using_reserved_resource;
+    }
+
+    /**
+     * @param is_using_reserved_resource the is_using_reserved_resource to set
+     */
+    public void setIs_using_reserved_resource(boolean is_using_reserved_resource) {
+        this.is_using_reserved_resource = is_using_reserved_resource;
+    }
+
+    /**
+     * @return the allowed_machine_ids
+     */
+    public LinkedList<Integer> getAllowed_machine_ids() {
+        return allowed_machine_ids;
+    }
+
+    /**
+     * @param allowed_machine_ids the allowed_machine_ids to set
+     */
+    public void setAllowed_machine_ids(LinkedList<Integer> allowed_machine_ids) {
+        this.allowed_machine_ids = allowed_machine_ids;
     }
 
 }

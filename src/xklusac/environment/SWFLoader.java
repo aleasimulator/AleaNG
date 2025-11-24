@@ -299,10 +299,7 @@ public class SWFLoader extends GridSim {
             ram = 1;
 
         }
-        if (!ExperimentSetup.use_RAM) {
-            ram = 0;
-        }
-
+        
         long job_limit = 0;
         if (values[8].contains(".")) {
             //System.out.println("old="+values[8]);
@@ -383,8 +380,14 @@ public class SWFLoader extends GridSim {
             if (ExperimentSetup.allocate_whole_nodes) {
                 numNodes = numCPU;
                 ppn = 1;
+            }else{
+                String prop = properties.substring(properties.indexOf(":")+1);
+                String[] spec = prop.split("x");
+                numNodes = Integer.parseInt(spec[0]);
+                ppn = Integer.parseInt(spec[1]);
             }
 
+            // FIX THIS
             if (ppn == -1 || numNodes == -1) {
                 String[] spec = properties.split("x");
                 numNodes = Integer.parseInt(spec[0]);
@@ -434,6 +437,8 @@ public class SWFLoader extends GridSim {
                 System.out.println(id + " ERROR: gpu and gpu_per_node mismatch: " + numNodes + " numNodes, " + gpus + " gpus, " + gpus_per_node + " gpus_per_node.");
             }
         }
+        
+        
 
         // DATA for synthetic experiment
         /*

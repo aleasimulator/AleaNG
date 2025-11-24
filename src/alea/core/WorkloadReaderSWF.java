@@ -237,9 +237,7 @@ public class WorkloadReaderSWF {
             double gbram = Math.round(ram * 10 / 1048576.0) / 10.0;
             //System.out.println(id+ " requests "+ram+" KB RAM, "+gbram+" GB RAM per "+numCPU+" CPUs");
         }
-        if (!ExperimentSetup.use_RAM) {
-            ram = 0;
-        }
+        
 
         // skip such job
         /*if (data_set.contains("zewura") || data_set.contains("wagapp") || data_set.contains("meta")) {

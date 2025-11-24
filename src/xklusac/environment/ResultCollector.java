@@ -675,10 +675,15 @@ public class ResultCollector {
 
         ExperimentSetup.users.clear();
         ExperimentSetup.user_logins.clear();
+        ExperimentSetup.groups.clear();
         ExperimentSetup.queues.clear();
         ExperimentSetup.queues_id_to_name_mapping.clear();
         ExperimentSetup.backfilled = 0;
         ExperimentSetup.backfilled_cons = 0;
+        Scheduler.waiting_for_preempted_job_to_arrive = false;
+        Scheduler.start_date = -1;
+        Scheduler.all_queues.clear();
+        Scheduler.all_queues_names.clear();
         System.out.println("Finished reseting internal values...");
     }
 

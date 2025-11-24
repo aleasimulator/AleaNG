@@ -1,6 +1,5 @@
 package xklusac.environment;
 
-import alea.core.AleaSimTags;
 import gridsim.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,6 +12,8 @@ import xklusac.extensions.BinaryHeap;
 import xklusac.extensions.FairshareGroup;
 import xklusac.extensions.HeapNode;
 import xklusac.extensions.Hole;
+import xklusac.extensions.MachineEarliestStartSlotComparator;
+import xklusac.extensions.MachineFreeCpuAvailabilityComparator;
 import xklusac.extensions.StartComparator;
 
 /**
@@ -142,6 +143,8 @@ public class ResourceInfo {
     TimeSeries series_usage;
     TimeSeries series_used;
 
+    public MachineList reserved_machines = null;
+
     /**
      * Creates a new instance of ResourceInfo with "in schedule" and "on
      * resource" lists of gridletInfos
@@ -157,25 +160,16 @@ public class ResourceInfo {
         this.peRating = resource.getMIPSRatingOfOnePE();
         this.stable_w = false;
         this.stable_s = false;
-        if (ExperimentSetup.use_RAM) {
-            AdvancedSpaceSharedWithRAM policy = null;
-            for (int i = 0; i < ExperimentSetup.local_schedulers.size(); i++) {
-                policy = (AdvancedSpaceSharedWithRAM) ExperimentSetup.local_schedulers.get(i);
-                if (policy.resource_.getResourceID() == this.resource.getResourceID()) {
-                    System.out.println(i + "th allocation policy '" + policy.name + "' is used for the resource no. " + this.resource.getResourceID() + " " + this.resource.getResourceName());
-                    break;
-                }
-            }
-        } else {
-            AdvancedSpaceShared policy = null;
-            for (int i = 0; i < ExperimentSetup.local_schedulers.size(); i++) {
-                policy = (AdvancedSpaceShared) ExperimentSetup.local_schedulers.get(i);
-                if (policy.resource_.getResourceID() == this.resource.getResourceID()) {
-                    System.out.println(i + "th allocation policy '" + policy.name + "' is used for the resource no. " + this.resource.getResourceID() + " " + this.resource.getResourceName());
-                    break;
-                }
+
+        AdvancedSpaceSharedWithRAM policy = null;
+        for (int i = 0; i < ExperimentSetup.local_schedulers.size(); i++) {
+            policy = (AdvancedSpaceSharedWithRAM) ExperimentSetup.local_schedulers.get(i);
+            if (policy.resource_.getResourceID() == this.resource.getResourceID()) {
+                System.out.println(i + "th allocation policy '" + policy.name + "' is used for the resource no. " + this.resource.getResourceID() + " " + this.resource.getResourceName());
+                break;
             }
         }
+
         series_usage = new TimeSeries(resource.getResourceName());
         series_used = new TimeSeries(resource.getResourceName());
 
@@ -337,40 +331,6 @@ public class ResourceInfo {
             }
         }
 
-        if (ExperimentSetup.use_RAM == false && ExperimentSetup.anti_starvation) {
-            MachineList machines = virt_machines;
-            int required = gi.getNumPE();
-            //System.out.println(this.resource.getResourceName()+ " Machines: ");
-            for (int i = 0; i < machines.size(); i++) {
-                MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
-                // cannot use such machine
-                if (machine.getFailed()) {
-                    continue;
-                }
-                // cannot use machine with job assigned if exclusive use required
-                if (excl && machine.getNumFreePE() < machine.getNumPE()) {
-                    //System.out.println(gi.getID() + " cannot execute on " + this.resource.getResourceName() + ", because prop=" + gi.getProperties()+ " and mach"+i+" has "+machine.getNumBusyPE()+" used CPUs");
-                    continue;
-                }
-                if (machine.getNumFreeVirtualPE() >= 1) {
-                    required -= machine.getNumFreeVirtualPE();
-                }
-                if (required <= 0) {
-                    //System.out.println(this.resource.getResourceName() + " will execute now gi: " + gi.getID());
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        if (ExperimentSetup.use_RAM == false) {
-            if (this.getNumFreePE() >= gi.getNumPE()) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
         if (this.getNumFreePE() < 1) {
             //System.out.println(gi.getID()+": No need to test nodespec - no free CPUs at all now at:"+this.resource.getResourceName());
             return false;
@@ -413,6 +373,7 @@ public class ResourceInfo {
             }
 
             if (allocateNodes <= 0) {
+                //System.out.println(gi.getID() + " nodes="+numNodes+" ncpus="+ppn+" to_be_allocated_nodes="+allocateNodes);
                 return true;
             }
         }
@@ -672,19 +633,7 @@ public class ResourceInfo {
 
     public boolean canExecuteEver(GridletInfo gi) {
 
-        if (ExperimentSetup.enforce_partition == false && ExperimentSetup.use_RAM == false) {
-
-            if (this.getNumRunningPE() >= gi.getNumPE()) {
-                //System.out.println(gi.getID() + " can run here at " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " >= " + gi.getNumPE());
-                return true;
-            } else {
-                //System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());
-                return false;
-            }
-
-        }
-
-        if (ExperimentSetup.enforce_partition == false && ExperimentSetup.use_RAM == true) {
+        if (ExperimentSetup.enforce_partition == false) {
             long ram = gi.getRam();
             int ppn = gi.getPpn();
             int numNodes = gi.getNumNodes();
@@ -714,7 +663,7 @@ public class ResourceInfo {
         String[] req_nodes = gi.getProperties().split(":");
 
         // returns false if this resource partition is not the one required by job in SWF
-        if (req_nodes.length == 1 && gi.getProperties().length() > 0 && !gi.getProperties().contains(":") && ExperimentSetup.enforce_partition && !gi.getProperties().contains("all")) {
+        if (ExperimentSetup.enforce_partition && !gi.getProperties().contains("all")) {
             String partition = this.resource.getProperties();
             if (!partition.equals(req_nodes[0])) {
                 //System.out.println(gi.getID() + " requires partition: " + gi.getProperties() + ", but this resource partition is: " + partition+" (cluster = "+this.resource.getResourceName()+")");
@@ -722,18 +671,10 @@ public class ResourceInfo {
             }
         }
 
-        if (ExperimentSetup.use_RAM == false) {
-            if (this.getNumRunningPE() >= gi.getNumPE()) {
-                return true;
-            } else {
-                //System.out.println(gi.getID() + " cannot run here - too few CPUs at: " + this.resource.getResourceName() + ", " + this.getNumRunningPE() + " < " + gi.getNumPE());
-                return false;
-            }
-        }
-
         long ram = gi.getRam();
         int ppn = gi.getPpn();
         int numNodes = gi.getNumNodes();
+        int GPUs_per_node = gi.getGpus_per_node();
 
         MachineList machines = this.resource.getMachineList();
         int allocateNodes = numNodes;
@@ -744,7 +685,7 @@ public class ResourceInfo {
             if (machine.getFailed()) {
                 continue;
             }
-            if (machine.getNumPE() >= ppn && machine.getRam() >= ram) {
+            if (machine.getNumPE() >= ppn && machine.getRam() >= ram && machine.getGpus() >= GPUs_per_node) {
                 allocateNodes--;
             }
             if (allocateNodes <= 0) {
@@ -907,7 +848,7 @@ public class ResourceInfo {
         PEs.add(index);
         gi.setPEs(PEs);
         gi.setPlannedPEs(PEs, "");
-        //System.out.println("PEs computation for: " + gi.getID() + " cpu=" + gi.getNumPE() + " PEs=" + PEs.size() + " status=" + gi.getGridlet().getGridletStatusString() + ")");
+        System.out.println("PEs computation for: " + gi.getID() + " cpu=" + gi.getNumPE() + " PEs=" + PEs.size() + " status=" + gi.getGridlet().getGridletStatusString() + ")");
     }
 
     /*
@@ -1356,9 +1297,6 @@ public class ResourceInfo {
      */
     private void predictFirstFreeSlots(double current_time) {
         int peIndex = 0;
-        ArrayList<Integer> used_cpus = new ArrayList();
-        ArrayList<Integer> occupied_by_job = new ArrayList();
-        ArrayList<Double> will_be_free_in = new ArrayList();
 
         // first - failed machines must have finishTimeOnPE[peIndex] = MAX_VALUE
         if (ExperimentSetup.failures) {
@@ -1393,50 +1331,33 @@ public class ResourceInfo {
 
         for (int j = 0; j < resInExec.size(); j++) {
             GridletInfo gi = (GridletInfo) resInExec.get(j);
-            List<Integer> PEs = gi.getPlannedPEs();
+            List<Integer> PEs = gi.getPEs();
+            // System.out.println(gi.getID()+": planned PEs size: "+PEs.size()+" at time: "+Math.round(current_time));
             if (gi.getStatus() == Gridlet.INEXEC) {
                 double run_time = current_time - gi.getGridlet().getExecStartTime();
                 double time_remaining = Math.max(0.0, (gi.getJobRuntime(peRating) - run_time));
                 double glFinishTime = time_remaining;
-                //double glFinishTime = time_remaining+ current_time;
-                if (glFinishTime < 1.0) {
-                    //System.out.println(gi.getID()+": rounding up running gridlet :"+glFinishTime);
-                    //glFinishTime = 1.0;
-                }
+
                 int roundUpTime = (int) (glFinishTime + 1);
 
                 // update all PE-finish-time that will run this gridlet
-                //
                 if (gi.getID() == ExperimentSetup.debug_job) {
                     System.out.println(gi.getID() + ": will finish at: " + (GridSim.clock() + glFinishTime) + " remains: " + (glFinishTime) + " est. runtime: " + gi.getJobRuntime(peRating));
                 }
 
                 if (PEs.size() < gi.getNumPE()) {
-                    //System.out.println(gi.getID() + " NO plannedPEs WEIRD status=" + gi.getGridlet().getGridletStatusString() + " resource=" + resource.getResourceName() + " at clock=" + GridSim.clock());
+                    System.out.println(gi.getID() + " NO planned PEs WEIRD status=" + gi.getGridlet().getGridletStatusString() + " resource=" + resource.getResourceName() + " at clock=" + GridSim.clock());
+                    // ALERT THIS DOES NOT WORK on topology aware jobs (nodes, ppn)
                     predictPEs(finishTimeOnPE, gi);
+                    PEs = gi.getPEs();
                 }
                 for (int k = 0; k < gi.getNumPE(); k++) {
-                    //finishTimeOnPE[PEs.get(k)] += roundUpTime;
 
-                    /*if (!used_cpus.contains(PEs.get(k))) {
-                        used_cpus.add(PEs.get(k));
-                        occupied_by_job.add(gi.getID());
-                        will_be_free_in.add(glFinishTime);
-                    } else {
-                        int job_o = occupied_by_job.get(used_cpus.indexOf(PEs.get(k)));
-                        double overlap = will_be_free_in.get(used_cpus.indexOf(PEs.get(k)));
-                        if (overlap > 1.0) {
-                            System.out.println(gi.getID() + ": gi alloc ERROR: this CPU_ID: " + PEs.get(k) + " is already used by job: " + job_o + " and will be free in: " + will_be_free_in.get(used_cpus.indexOf(PEs.get(k))));
-                        }
-                    }*/
                     finishTimeOnPE[PEs.get(k)] += (glFinishTime);
                     //
                     if (gi.getID() == ExperimentSetup.debug_job) {
                         System.out.print("[" + PEs.get(k) + "]" + finishTimeOnPE[PEs.get(k)] + ",");
                     }
-                    /*if (PEs.get(k) == 0) {
-                        System.out.println(gi.getID() + " is using CPU 0, slot = " + finishTimeOnPE[PEs.get(k)]);
-                    }*/
 
                     peIndex++;
                 }
@@ -1450,8 +1371,10 @@ public class ResourceInfo {
                 gi.setTardiness(giTard);
             } else if (gi.getStatus() != Gridlet.SUCCESS && gi.getStatus() != Gridlet.INEXEC && gi.getStatus() != Gridlet.QUEUED && gi.getStatus() != Gridlet.FAILED_RESOURCE_UNAVAILABLE) {
 
+                //System.out.println(gi.getID() + " not executing, WEIRD status=" + gi.getGridlet().getGridletStatusString() + " resource=" + resource.getResourceName() + " at clock=" + GridSim.clock());
                 if (PEs.size() < gi.getNumPE()) {
-                    //System.out.println(gi.getID() + " NO plannedPEs WEIRD status=" + gi.getGridlet().getGridletStatusString() + " resource=" + resource.getResourceName() + " at clock=" + GridSim.clock());
+                    System.out.println(gi.getID() + " NO planned PEs WEIRD status=" + gi.getGridlet().getGridletStatusString() + " resource=" + resource.getResourceName() + " at clock=" + GridSim.clock());
+                    // ALERT THIS DOES NOT WORK on topology aware jobs (nodes, ppn)
                     predictPEs(finishTimeOnPE, gi);
                 }
                 double max = 0.0;
@@ -2346,6 +2269,145 @@ public class ResourceInfo {
     }
 
     public LinkedList<GridletInfo> findAndCheckpointJobs(GridletInfo gi, int priority_level) {
+
+        MachineList machines = this.resource.getMachineList();
+        MachineList machines_sorted = new MachineList();
+        for (int i = 0; i < machines.size(); i++) {
+            MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
+            machines_sorted.add(machine);
+        }
+
+        // sort machines such that free machines come first
+        // TO DO: once we build checkpointed list, this order may not hold anymore 
+        // (we do not notice that a job will free other machines since we only check them in a fixed order)
+        // (ideally, next machine to check should be those from the terminated job used_machine_list)
+        System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
+        Collections.sort(machines_sorted, new MachineFreeCpuAvailabilityComparator());
+
+        long ram = gi.getRam();
+        int ppn = gi.getPpn();
+        int numNodes = gi.getNumNodes();
+        int GPUs_per_node = gi.getGpus_per_node();
+
+        LinkedList<GridletInfo> checkpointed_jobs = new LinkedList<>();
+
+        int allocateNodes = numNodes;
+
+        for (int i = 0; i < machines_sorted.size(); i++) {
+            MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines_sorted.get(i);
+            //System.out.println(machine.getMachineID() + " PRE machine has " + machine.getNumFreePE() + " free CPUs and " + machine.getFreeGPUs() + " GPUs");
+        }
+
+        boolean was_ready_already = true;
+        //System.out.println(this.resource.getResourceName()+ " Machines: "+machines.size());
+        for (int i = 0; i < machines_sorted.size(); i++) {
+            MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines_sorted.get(i);
+            //either use it if machine is free or checkpoint jobs as needed
+            //System.out.println(machine.getMachineID() + " DURING machine has " + machine.getNumFreePE() + " free CPUs");
+            if (machine.getNumFreePE() >= ppn && machine.getFreeRam() >= ram && machine.getFreeGPUs() >= GPUs_per_node) {
+                allocateNodes--;
+            } else {
+                was_ready_already = false;
+                LinkedList<GridletInfo> local_jobs = checkpointJobsOnOneMachine(checkpointed_jobs, machine, gi, priority_level);
+                if (local_jobs != null) {
+                    checkpointed_jobs.addAll(local_jobs);
+                    allocateNodes--;
+                    //System.out.println("Jobs to preempt size: "+local_jobs.size());
+                    //quick fix for the whole node job scenario only
+                    if (ExperimentSetup.allocate_whole_nodes && local_jobs.size()>0) {
+                        GridletInfo to_be_preempted_job = local_jobs.getFirst();
+                        //System.out.println("testing: "+to_be_preempted_job.getID());
+                        if (to_be_preempted_job.getNumNodes() > allocateNodes) {
+                            //System.out.println("Stopping sooner!");
+                            //killing such job will free enough resources for whole node jobs so quit now
+                            allocateNodes = 0;
+                        }else{
+                            //System.out.println("Job: "+to_be_preempted_job.getID()+" is not sufficient: "+(to_be_preempted_job.getNumNodes() > allocateNodes)+" "+(to_be_preempted_job.getRam() >= ram));
+                        }
+                    }
+                }
+            }
+            if (allocateNodes <= 0) {
+                System.out.println("Done: job " + gi.getID() + " needs [" + numNodes + "x" + ppn + "] CPUs, # of required checkpointed jobs: " + checkpointed_jobs.size());
+
+                return checkpointed_jobs;
+            }
+
+        }
+        return null;
+    }
+
+    private LinkedList<GridletInfo> checkpointJobsOnOneMachine(LinkedList<GridletInfo> previously_checkpointed_jobs, MachineWithRAMandGPUs machine, GridletInfo gi, int priority_level) {
+        LinkedList<GridletInfo> checkpointed_jobs = new LinkedList<>();
+        String added = "";
+        String reused = "";
+        long ram = gi.getRam();
+        int ppn = gi.getPpn();
+        int GPUs_per_node = gi.getGpus_per_node();
+
+        long free_ram = machine.getFreeRam();
+        int freePE = machine.getNumFreePE();
+        int freeGPUs = machine.getFreeGPUs();
+
+        // update available capacity wrt. already checkpointed jobs
+        for (int i = 0; i < previously_checkpointed_jobs.size(); i++) {
+            ComplexGridlet g = (ComplexGridlet) previously_checkpointed_jobs.get(i).getGridlet();
+            GridletInfo gin = previously_checkpointed_jobs.get(i);
+            //System.out.println(gin.getID() + " is already checkpointed, using PEs: " + g.getPEs().toString() + " this mach: " + machine.getMachineID() + " runs: " + machine.getRunningJobsString());
+            if (machine.containsJob(g)) {
+                //System.out.println(gin.getID() + " runs on " + machine.getMachineID());
+                reused += gin.getID() + " ";
+
+                free_ram += gin.getRam();
+                freePE += gin.getPpn();
+                freeGPUs += gin.getGpus_per_node();
+            }
+        }
+        // kill as many running jobs as necessary
+        ArrayList<ResGridlet> running_jobs = machine.running_jobs;
+        for (int i = 0; i < running_jobs.size(); i++) {
+            ComplexGridlet cg = (ComplexGridlet) running_jobs.get(i).getGridlet();
+            GridletInfo checkpointed_job = findGiInResInExec(cg);
+            // only consider this running job if it has not been used (checkpointed on a previous machine) already! (as a previously_chckp_job)
+            if (!previously_checkpointed_jobs.contains(checkpointed_job)) {
+                //System.out.println(checkpointed_job.getID() + " runs first here " + machine.getMachineID());
+                checkpointed_job.machines_used += machine.getMachineID() + " ";
+
+                // check job priority level...
+                int ge_p = ExperimentSetup.queues.get(checkpointed_job.getQueue()).getPriority();
+                if (ge_p < priority_level) {
+                    free_ram += cg.getRam();
+                    freePE += cg.getPpn();
+                    freeGPUs += cg.getGpus_per_node();
+                    if (!previously_checkpointed_jobs.contains(checkpointed_job)) {
+                        added += cg.getGridletID() + "(" + cg.getPpn() + "),";
+                        checkpointed_jobs.add(checkpointed_job);
+                    }
+                }
+            }
+
+            if (free_ram >= ram && freePE >= ppn && freeGPUs >= GPUs_per_node) {
+                //System.out.println("machine " + machine.getMachineID() + " should have " + freePE + " CPUs after chckp. Added: " + added + " Reused: " + reused);
+                return checkpointed_jobs;
+
+            }
+        }
+
+        return null;
+    }
+
+    public GridletInfo findGiInResInExec(ComplexGridlet cg) {
+
+        for (int j = 0; j < resInExec.size(); j++) {
+            GridletInfo gi = (GridletInfo) resInExec.get(j);
+            if (gi.getGridlet().equals(cg)) {
+                return gi;
+            }
+        }
+        return null;
+    }
+
+    public LinkedList<GridletInfo> findAndCheckpointJobsWhenWholeNodesAllocations(GridletInfo gi, int priority_level) {
         int required = Math.max(0, (gi.getNumPE() - getNumFreePE()));
         int freed = 0;
         LinkedList<GridletInfo> checkpointed_jobs = new LinkedList<>();
@@ -2353,6 +2415,7 @@ public class ResourceInfo {
             GridletInfo ge = resInExec.get(i);
             int ge_p = ExperimentSetup.queues.get(ge.getQueue()).getPriority();
             if (ge_p < priority_level) {
+                // ALERT - this is not sufficient if jobs do not allocate whole nodes!
                 freed += ge.getNumPE();
                 checkpointed_jobs.add(ge);
                 if (freed >= required) {
@@ -2379,25 +2442,127 @@ public class ResourceInfo {
 
     /**
      * Queue only method (not to be used with schedules) - gets first available
-     * start time for gridlet corresponding to gi parameter
+     * start time for the TOP job (gi).
      */
-    public double getEarliestStartTime(GridletInfo gi, double current_time) {
+    public void getEarliestStartTimeForTopJob(GridletInfo gi, double current_time) {
+        this.reserved_machines = null;
         // updates finishTimeOnPE
         this.updateFinishTimeOfAssignedGridlets(current_time);
-        // get EST according to gi PE count
-        //System.out.println("===========================================================");
-        //System.out.println(gi.getNumPE() + " CPUs required for gi :" + gi.getID());
-        int index = findFirstFreeSlot(finishTimeOnPE, gi);
-        for (int j = 0; j < finishTimeOnPE.length; j++) {
-            //  System.out.println(j+":"+finishTimeOnPE[j]);
-        }
-        this.est = finishTimeOnPE[index]; // Earl. Start Time for head of active_scheduling_queue
-        this.usablePEs = findUsablePEs(index, finishTimeOnPE, gi);
-        //System.out.println(gi.getNumPE() + " CPUs required and found " + usablePEs + " for gi :" + gi.getID()+" min time = "+this.est);
-        //System.out.println("===========================================================");
 
-//        for(int i = 0; i<)
-        return this.est;
+        // get EST according to gi PE count
+        // ALERT does this respect nodes and chunks? I don't think so.
+        // THIS DOES not work for topology-aware jobs (numnodes, ppn)
+        //int index = findFirstFreeSlot(finishTimeOnPE, gi);
+        //this.est = finishTimeOnPE[index]; // Earl. Start Time for head of active_scheduling_queue
+        MachineList machines_sorted = getReservationTimeForTopJob(gi);
+        this.est = ((MachineWithRAMandGPUs) machines_sorted.get(gi.getNumNodes() - 1)).getEst();
+        //this.usablePEs = findUsablePEs(index, finishTimeOnPE, gi);
+
+        this.reserved_machines = machines_sorted;
+    }
+
+    /**
+     * New method to espablish a reservation for TOP JOB
+     *
+     */
+    public MachineList getReservationTimeForTopJob(GridletInfo gi) {
+        MachineList machines = this.resource.getMachineList();
+        MachineList machines_sorted = new MachineList();
+
+        long ram = gi.getRam();
+        int ppn = gi.getPpn();
+        int numNodes = gi.getNumNodes();
+        int GPUs_per_node = gi.getGpus_per_node();
+        ArrayList<Double> earliest_start_times = new ArrayList();
+
+        int allocateNodes = numNodes;
+        //System.out.println(this.resource.getResourceName()+ " Machines: "+machines.size());
+        for (int i = 0; i < machines.size(); i++) {
+            MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
+            // cannot use such machine
+            if (machine.getFailed() || machine.getNumPE() < ppn) {
+                //System.out.println(gi.getID() + " skipping this machine " + i);
+                continue;
+            }
+            machine.banned_PEs = 0;
+            machine.banned_GPUs = 0;
+            boolean success = machine.calculateMachineCapacityInTime(GridSim.clock());
+            //System.out.println(gi.getID()+" success on machine "+i);
+            for (int c = 0; c < machine.capacity_list.size(); c++) {
+                Capacity cap = machine.capacity_list.get(c);
+                if (cap.getCpus() >= ppn && cap.getRam() >= ram && cap.getGpus() >= GPUs_per_node) {
+                    earliest_start_times.add(cap.getStart_time());
+                    machine.setEst(cap.getStart_time());
+                    machines_sorted.add(machine);
+                    if (c == 0) {
+                        // System.out.println(gi.getID() + " adding to est list, size = " + earliest_start_times.size() + " on machine " + i+" usable free CAP = "+(cap.getCpus()-ppn));
+                    }
+                    break;
+                }
+            }
+        }
+
+        // now sort them (FUTURE WORK: consider best-fit selection that will create less gaps). Now we choose those earliest...
+        Collections.sort(earliest_start_times);
+        System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
+        Collections.sort(machines_sorted, new MachineEarliestStartSlotComparator());
+        double earliest_start_time = earliest_start_times.get(numNodes - 1);
+        //System.out.println(gi.getID() + " finding res for numnodes=" + numNodes + " ncpus=" + ppn + " on Res " + this.resource.getResourceName() + " that has machines = " + machines.size() + " and est list size: " + earliest_start_times.size() + " EST = " + earliest_start_time+" at time: "+GridSim.clock());
+
+        //ban reserved nodes and their CPUs and set their EST time (reservation time)
+        for (int b = 0; b < numNodes; b++) {
+            MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines_sorted.get(b);
+            if (machine.getNumFreePE() > 0) {
+                machine.banned_PEs = ppn;
+                machine.banned_GPUs = GPUs_per_node;
+                //System.out.println(gi.getID() + " Banning " + machine.banned_PEs + " CPUs on cl: "+this.resource.getResourceName()+" machine with EST: " + machine.getEst() + " machine id:" + machine.getMachineID()+" free: "+machine.getNumFreePE());
+                machine.setEst(earliest_start_time);
+            }
+
+        }
+
+        return machines_sorted;
+    }
+
+    public boolean canGridletFitNextToReservation(GridletInfo gi, GridletInfo grsv) {
+        MachineList machines = reserved_machines;
+
+        long ram = gi.getRam();
+        int ppn = gi.getPpn();
+        int numNodes = gi.getNumNodes();
+        int GPUs_per_node = gi.getGpus_per_node();
+        int allocateNodes = numNodes;
+
+        gi.getGridlet().getAllowed_machine_ids().clear();
+
+        int reserved_ppn = grsv.getPpn();
+
+        //System.out.println(this.resource.getResourceName()+ " Machines: "+machines.size());
+        for (int i = 0; i < machines.size(); i++) {
+            MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
+            int freePpn = Math.max(0, (machine.getNumFreePE() - machine.banned_PEs));
+            int freeGPUs = Math.max(0, (machine.getFreeGPUs() - machine.banned_GPUs));
+
+            // cannot use such machine
+            if (machine.getFailed() || freePpn < ppn || freeGPUs < GPUs_per_node) {
+                //System.out.println(gi.getID() + " skipping this machine " + i);
+                continue;
+            }
+            if (freePpn >= ppn && machine.getFreeRam() >= ram && freeGPUs >= GPUs_per_node) {
+                allocateNodes--;
+                // add this machine to allowed list
+                gi.getGridlet().getAllowed_machine_ids().add(machine.getMachineID());
+                //System.out.println(gi.getID() + ": adding allowed machine: "+machine.getMachineID()+" that has free: "+machine.getNumFreePE()+" minus banned: "+machine.banned_PEs);
+
+                if (allocateNodes <= 0) {
+                    //System.out.println(gi.getID() + " fits around "+grsv.getID()+" reservation, wants: nodes=" + numNodes + " and ncpus=" + ppn + 
+                    //        " on Res " + this.resource.getResourceName() + " and gets "+gi.getGridlet().getAllowed_machine_ids().size()+" machines, time: "+GridSim.clock());
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -9,7 +9,7 @@ import xklusac.environment.GridletInfo;
 public class ProcessorComparator implements Comparator {
     
     /**
-     * Compares two gridlets according to their start time
+     * Compares two CPUs according to their ID.
      */
     public int compare(Object o1, Object o2) {
         Integer g1 = (Integer) o1;

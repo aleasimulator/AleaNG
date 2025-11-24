@@ -21,6 +21,7 @@ import xklusac.extensions.ProcessorComparator;
  */
 public class GridletInfo {
 
+    public String machines_used = "";
     /**
      * owner id
      */
@@ -887,6 +888,7 @@ public class GridletInfo {
     }
 
     /**
+     * This method checks whether this job can checkpoint other jobs wrt. to its queue-limits, group and user quota (if it can run right now)
      * @return the checkpoint_limit_eligible
      */
     public boolean isCheckpoint_limit_eligible() {

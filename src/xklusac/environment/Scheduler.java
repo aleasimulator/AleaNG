@@ -25,6 +25,7 @@ import xklusac.extensions.*;
  */
 public class Scheduler extends GridSim {
 
+    public static boolean waiting_for_preempted_job_to_arrive = false;
     /**
      * list of Resources
      */
@@ -856,8 +857,8 @@ public class Scheduler extends GridSim {
                 continue;
             }
             if (ev.get_tag() == AleaSimTags.EVENT_SCHEDULE) {
-                /*if(ev.get_data()!=null){
-                    System.out.println(GridSim.clock()+": SCHEDULER: scheduling due to: "+ev.get_data());
+                /*if (ev.get_data() != null) {
+                    System.out.println(GridSim.clock() + ": SCHEDULER: scheduling due to: " + ev.get_data()+" prev_sch:"+prev_scheduled+" waiting:"+waiting_for_preempted_job_to_arrive);
                 }*/
 
                 // do another scheduling round
@@ -889,7 +890,10 @@ public class Scheduler extends GridSim {
             // gridlet was finished. Get it, record results and do another scheduling run
             if (ev.get_tag() == GridSimTags.GRIDLET_RETURN) {
                 ComplexGridlet gridlet_received = (ComplexGridlet) ev.get_data();
-                //System.out.println("Gridlet: "+gridlet_received.getGridletID()+" returned to Scheduler, status: "+gridlet_received.getGridletStatusString()+" at time: "+GridSim.clock());
+                //System.out.println("Gridlet: " + gridlet_received.getGridletID() + " returned to Scheduler, status: " + gridlet_received.getGridletStatusString() + " at time: " + GridSim.clock());
+                if(gridlet_received.getGridletStatus() == Gridlet.PAUSED){
+                    this.waiting_for_preempted_job_to_arrive = false;    
+                }
                 // remove job from schedule on resource
                 for (int j = 0; j < resourceInfoList.size(); j++) {
                     ResourceInfo ri = (ResourceInfo) resourceInfoList.get(j);
@@ -975,7 +979,7 @@ public class Scheduler extends GridSim {
 
                     }
                     if (prev_scheduled == 0) {
-                        super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE);
+                        super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE, "Group");
                         //scheduleGridlets();
                     }
                 }
@@ -1115,7 +1119,7 @@ public class Scheduler extends GridSim {
                      * scheduleGridlets(); Date dd2 = new Date(); clock2 =
                      * dd2.getTime(); clock += clock2 - clock1;
                      */
-                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE);
+                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE, "completed job:"+gridlet_received.getGridletID());
                 }
 
                 // null gridlet to allow garbage collection
@@ -1247,7 +1251,7 @@ public class Scheduler extends GridSim {
                 //System.out.println(GridSim.clock() + ": Try Scheduling gridlets from schedule of size: " + getQueueSize() + " prev_scheduled = " + prev_scheduled);
                 if (prev_scheduled == 0) {
                     //System.out.println(GridSim.clock() + ": Scheduling gridlets from schedule of size: " + getQueueSize());
-                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE);
+                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE, "new job:" + gi.getID());
                     //scheduleGridlets();
                 }
                 continue; // with other incoming event
@@ -1316,7 +1320,9 @@ public class Scheduler extends GridSim {
             }
         }
 
-        prev_scheduled += ExperimentSetup.policy.selectJob();
+        if (!waiting_for_preempted_job_to_arrive) {
+            prev_scheduled += ExperimentSetup.policy.selectJob();
+        }
         Date d2 = new Date();
         clock2 = d2.getTime();
         clock += clock2 - clock1;

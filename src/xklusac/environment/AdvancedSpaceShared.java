@@ -4,6 +4,7 @@ import alea.core.AleaSimTags;
 import gridsim.*;
 import eduni.simjava.Sim_event;
 import eduni.simjava.Sim_system;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import xklusac.environment.FailureLoaderNew.Failure;
 
@@ -321,7 +322,7 @@ class AdvancedSpaceShared extends AllocPolicy {
 
             if (this.getNumFreePE() > 0 && gridletQueueList_.size() == 0) {
 
-                success = allocatePEtoGridlet(rgl);
+                success = allocatePEtoGridlet(rgl, 1);
                 //System.out.println(rgl.getGridletID()+" is alloc = "+success);
             }
         }
@@ -605,7 +606,7 @@ class AdvancedSpaceShared extends AllocPolicy {
             // if there is an available PE slot, then allocate immediately
             boolean success = false;
             if (gridletInExecList_.size() < super.totalPE_) {
-                success = allocatePEtoGridlet(rgl);
+                success = allocatePEtoGridlet(rgl, rgl.getNumPE());
             }
 
             // otherwise put into Queue list
@@ -662,7 +663,7 @@ class AdvancedSpaceShared extends AllocPolicy {
                         success = allocatePEtoGridlet(obj, obj.getNumPE());
                     }
                 } else {
-                    success = allocatePEtoGridlet(obj);
+                    success = allocatePEtoGridlet(obj, 1);
                 }
                 if (success == true) {
                     // Remove only when successfully done
@@ -750,81 +751,6 @@ class AdvancedSpaceShared extends AllocPolicy {
     }
 
     /**
-     * Allocates a Gridlet into a free PE and sets the Gridlet status into
-     * INEXEC and PE status into busy afterwards
-     *
-     * @param rgl a ResGridlet object
-     * @return <tt>true</tt> if there is an empty PE to process this Gridlet,
-     * <tt>false</tt> otherwise
-     * @pre rgl != null
-     * @post $none
-     */
-    private boolean allocatePEtoGridlet(ResGridlet rgl) {
-        // IDENTIFY MACHINE which has a free PE and add this Gridlet to it.
-        MachineWithRAMandGPUs myMachine = null;
-        MachineList mList = resource_.getMachineList();
-        //System.out.println(rgl.getGridletID()+" start..."+mList.size());
-        int peIndex = -1;
-        // gets the list of PEs and find one empty PE
-
-        //System.out.println(rgl.getGridletID()+" avail machines = ");
-        for (int i = 0; i < mList.size(); i++) {
-            myMachine = (MachineWithRAMandGPUs) mList.get(i);
-            if (!myMachine.getFailed() && myMachine.getNumFreePE() > 0) {
-                break;
-            } else {
-                peIndex += myMachine.getNumPE();
-                myMachine = null;
-            }
-
-        }
-        // If a Machine is empty then ignore the rest
-        if (myMachine == null) {
-            System.out.println(rgl.getGridletID() + " null machine");
-            return false;
-        }
-        //System.out.println(rgl.getGridletID()+" not null machine...");
-        PEList MyPEList = myMachine.getPEList();
-        int freePE = MyPEList.getFreePEID();
-        peIndex += freePE + 1;
-        // ALLOCATE IMMEDIATELY
-
-        rgl.setMachineAndPEID(myMachine.getMachineID(), freePE);
-
-        // set PEs list
-        LinkedList<Integer> PEs = new LinkedList();
-        PEs.add(peIndex);
-        //((ComplexGridlet) rgl.getGridlet()).setPEs(PEs);
-        rgl.setGridletStatus(Gridlet.INEXEC);   // change Gridlet status
-        // add this Gridlet into execution list
-        gridletInExecList_.add(rgl);
-        // Set allocated PE to BUSY status
-        super.resource_.setStatusPE(PE.BUSY, rgl.getMachineID(), freePE);
-
-        // Identify Completion Time and Set Interrupt
-        int rating = machineRating_[rgl.getMachineID()];
-        double time = forecastFinishTime(rating,
-                rgl.getRemainingGridletLength());
-
-        int roundUpTime = (int) (time + 1);   // rounding up
-        rgl.setFinishTime(time);
-
-        //update machine usage
-        Scheduler.load += (Scheduler.activePEs / Scheduler.availPEs) * (GridSim.clock() - Scheduler.last_event);
-        Scheduler.classic_load += (Scheduler.classic_activePEs / Scheduler.classic_availPEs) * (GridSim.clock() - Scheduler.last_event);
-        Scheduler.max_load += 1.0 * (GridSim.clock() - Scheduler.last_event);
-        Scheduler.last_event = GridSim.clock();
-        Scheduler.activePEs += 1 * super.resource_.getMIPSRatingOfOnePE();
-        Scheduler.classic_activePEs += 1;
-
-        // then send this into itself
-        //super.sim_schedule(super.myId_, time, GridSimTags.INSIGNIFICANT);
-        super.sim_schedule(super.myId_, time, GridSimTags.INSIGNIFICANT, rgl);
-
-        return true;
-    }
-
-    /**
      * Allocates a Gridlet requiring multiple PEs into a free PEs and sets the
      * Gridlet status into INEXEC and PEs status into busy afterwards.
      *
@@ -841,7 +767,7 @@ class AdvancedSpaceShared extends AllocPolicy {
         MachineList machines = resource_.getMachineList();
         int allocate = numPE;
         int peIndex = -1;
-        LinkedList<Integer> PEs = new LinkedList();
+        ArrayList<Integer> PEs = new ArrayList();
 
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
@@ -876,7 +802,7 @@ class AdvancedSpaceShared extends AllocPolicy {
             }
         }
 
-        //((ComplexGridlet) rgl.getGridlet()).setPEs(PEs);
+        ((ComplexGridlet) rgl.getGridlet()).setPEs(PEs);
         // change Gridlet status
         rgl.setGridletStatus(Gridlet.INEXEC);
 
@@ -885,6 +811,12 @@ class AdvancedSpaceShared extends AllocPolicy {
 
         // Identify Completion Time and Set Interrupt
         int ids[] = rgl.getListMachineID();
+        
+        // hack needed to fix GridSim bug
+        if (ids == null) {
+            ids = new int[1];
+            ids[0] = rgl.getMachineID();
+        }
 
         // Not needed when all machines have same PE rating - just for future developement
         int rating = Integer.MAX_VALUE;

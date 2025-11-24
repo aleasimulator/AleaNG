@@ -61,13 +61,15 @@ public class FairshareAggressiveBackfillingPreempt implements SchedulingPolicy {
 
             }
             if (currently_free_CPUs == 0) {
-                System.out.println("Backfill terminated immediately due to no free resources: " + currently_free_CPUs + " free CPUs.");
+                //System.out.println("Backfill terminated immediately due to no free resources: " + currently_free_CPUs + " free CPUs.");
                 return 0;
             }
         }
 
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
             Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
+            //System.out.println(Scheduler.all_queues_names.get(q) + " has " + Scheduler.active_scheduling_queue.size() + " jobs and priority " + ExperimentSetup.queues.get(Scheduler.all_queues_names.get(q)).getPriority());
+            
             if (ExperimentSetup.use_fairshare) {
                 // reset temp usage if time passed since last time
                 scheduler.resetTemporaryUsageAndUpdateFF();
@@ -91,22 +93,31 @@ public class FairshareAggressiveBackfillingPreempt implements SchedulingPolicy {
 
                 // try preemption (only non-preempted job from higher priority queue with OK user/queue limits can evict other jobs)
                 boolean is_active_queue_eligible = q < Scheduler.all_queues.size() - 1;
+                // isCheckpoint_limit_eligible() - checks whether this job is not subject to quota limits already 
+                // isPreempted() checks that this is not the previously preempted job
                 if (is_active_queue_eligible && ExperimentSetup.use_preemption && r_cand == null && gi.isCheckpoint_limit_eligible() && !gi.getGridlet().isPreempted()) {
                     int gridlet_priority_level = ExperimentSetup.queues.get(gi.getQueue()).getPriority();
 
                     for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                         ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
                         if (Scheduler.isSuitable(ri, gi)) {
+                            System.out.println("====== find preemptable jobs for: " + gi.getID()+" from "+gi.getQueue()+" at position "+i);
                             LinkedList<GridletInfo> checkpointed_jobs = ri.findAndCheckpointJobs(gi, gridlet_priority_level);
+                            //System.out.println("=========end of finding==========");
                             boolean success = false;
                             if (checkpointed_jobs != null) {
                                 success = true;
-                                System.out.println("===========================");
-                                System.out.println(gi.getID() + " needs " + gi.getNumPE() + " CPUs and resource_" + ri.resource.getResourceName() + " now has " + ri.getNumFreePE() + " at time: " + GridSim.clock());
-                                System.out.println(gi.getID() + ": PREEMPT these " + printCheckpointedJobs(checkpointed_jobs) + " jobs. This job has status = " + gi.getGridlet().getGridletStatusString());
+                                System.out.println("=========== initiate preemption ================");
+                                System.out.println(gi.getID() + " needs " + gi.getNumNodes()+ "x"+gi.getPpn()+" CPUs, resource_" + ri.resource.getResourceName() + " now has " + ri.getNumFreePE() + " at time: " + GridSim.clock());
+                                System.out.println(gi.getID() + ": Aggressive Backfill -> PREEMPT these " + printCheckpointedJobs(checkpointed_jobs) + " jobs. This job has status = " + gi.getGridlet().getGridletStatusString());
+                                if (checkpointed_jobs.size() > 0) {
+                                    Scheduler.waiting_for_preempted_job_to_arrive = true;
+                                }
                                 scheduler.sim_schedule(ri.resource.getResourceID(), 0.0, AleaSimTags.POLICY_CHECKPOINT, (checkpointed_jobs));
+                                System.out.println("=============== done ================");
                             }
                             if (success) {
+                                // we can quit now because next time there will be free resources and gi will run
                                 return scheduled;
                             }
                         }
@@ -154,7 +165,8 @@ public class FairshareAggressiveBackfillingPreempt implements SchedulingPolicy {
     private String printCheckpointedJobs(LinkedList<GridletInfo> checkpointed_jobs) {
         String jobs = "";
         for (int i = 0; i < checkpointed_jobs.size(); i++) {
-            jobs += checkpointed_jobs.get(i).getID() + ", ";
+            GridletInfo gi = checkpointed_jobs.get(i);
+            jobs += gi.getID() + "["+gi.getNumNodes()+"x"+gi.getPpn()+"](nodes: "+gi.getGridlet().assigned_machines+"), ";
         }
         return jobs;
     }

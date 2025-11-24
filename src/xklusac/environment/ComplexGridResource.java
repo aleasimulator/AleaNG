@@ -503,6 +503,7 @@ public class ComplexGridResource extends GridResource {
             }
 
             // process this Gridlet to this ComplexGridResource
+            //System.out.println("Seting res. param: "+super.get_id()+ " cost "+resource_.getCostPerSec());
             gl.setResourceParameter(super.get_id(), resource_.getCostPerSec());
             policy_.gridletSubmit(gl, ack);
         } catch (ClassCastException c) {
@@ -511,7 +512,7 @@ public class ComplexGridResource extends GridResource {
             System.out.println(c.getMessage());
         } catch (Exception e) {
             System.out.println(super.get_name() + ".processGridletSubmit(): "
-                    + "Exception error.");
+                    + "Exception error. Details follow: ");
             System.out.println(e.getMessage());
         }
     }

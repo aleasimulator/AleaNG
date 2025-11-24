@@ -245,7 +245,8 @@ public class EASY_Backfilling implements SchedulingPolicy {
         for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
             ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
             if (ri.getNumRunningPE() >= grsv.getNumPE()) {
-                double ri_est = ri.getEarliestStartTime(grsv, GridSim.clock());
+                ri.getEarliestStartTimeForTopJob(grsv, GridSim.clock());
+                double ri_est = ri.est;
                 // select minimal EST
                 if (ri_est <= est) {
                     est = ri_est;

@@ -112,7 +112,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
 
                 used_mips = Math.round((used_mips / mips) * 10000.0);
                 used_usage = Math.round((used_usage / usage) * 10000.0);
-                System.out.println("Cluster "+resource_.getResourceName() + ": weigh. usage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened jobs due to exceeded runtime limit = " + shortened);
+                System.out.println("Cluster " + resource_.getResourceName() + ": weigh. usage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened jobs due to exceeded runtime limit = " + shortened);
                 failure_time = 0.0;
                 wfailure_time = 0.0;
                 used_mips = 0.0;
@@ -745,13 +745,13 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
     }
 
     private void endGridlet(ResGridlet obj) {
-        obj.getGridletID();
-        //System.out.println("END "+obj.getGridletID()+ " finished at time: "+GridSim.clock());
         double load = getMIShare(obj.getGridletLength(), obj.getMachineID());
         obj.updateGridletFinishedSoFar(load);
         //System.out.println(obj.getGridletID()+ " updated finSoFar by: "+load+ " load at time "+GridSim.clock());
-        gridletInExecList_.remove(obj);
-        gridletFinish(obj, Gridlet.SUCCESS);
+        boolean isStillRunning = gridletInExecList_.remove(obj);
+        if (isStillRunning) {
+            gridletFinish(obj, Gridlet.SUCCESS);
+        }
         //System.out.println("END "+obj.getGridletID()+ " finished at time: "+GridSim.clock()+" remain: "+obj.getRemainingGridletLength());
     }
 
@@ -867,10 +867,21 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
         int peIndex = -1;
         ArrayList<Integer> PEs = new ArrayList();
 
+        boolean is_using_reserved_resource = ((ComplexGridlet) rgl.getGridlet()).isIs_using_reserved_resource();
+        LinkedList<Integer> allowed_machine_ids = new LinkedList();
+        if (is_using_reserved_resource) {
+            allowed_machine_ids = ((ComplexGridlet) rgl.getGridlet()).getAllowed_machine_ids();
+        }
+
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
             // cannot use such machine
             if (machine.getFailed()) {
+                peIndex += machine.getNumPE();
+                continue;
+            }
+
+            if (is_using_reserved_resource && !allowed_machine_ids.contains(machine.getMachineID())) {
                 peIndex += machine.getNumPE();
                 continue;
             }
@@ -884,8 +895,11 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 allocateNodes--;
                 machine.setUsedRam(machine.getUsedRam() + ram);
                 machine.setUsed_gpus(machine.getUsed_gpus() + gpus);
-                //if(gpus>0)System.out.println(machine.getMachineID()+": Allocating GPU on "+this.resName_+" free = "+machine.getFreeGPUs());
 
+                /*if(machine.banned_PEs>0){
+                    System.out.println(rgl.getGridletID()+" Banned PEs are: "+machine.banned_PEs+" and this machine ("+machine.getMachineID()+") is allowed? "+allowed_machine_ids.contains(machine.getMachineID()));
+                    System.out.println(rgl.getGridletID()+" Reason: "+((ComplexGridlet) rgl.getGridlet()).getExpectedFinishTime());
+                }*/
                 for (int j = 0; j < ppn; j++) {
                     PEList MyPEList = machine.getPEList();
                     int freePE = MyPEList.getFreePEID();
@@ -898,12 +912,18 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                     // update first next avail time
                     double nextFreeTime = GridSim.clock() + ((ComplexGridlet) rgl.getGridlet()).getJobLimit();
                     machine.setFirstFreeTimeOnPE(freePE, nextFreeTime);
+                    //machine.PE_to_job_mapping.put(freePE, rgl);
                 }
-            }
+                //machine.job_gpu_usage.put(rgl.getGridletID(), gpus);
+                machine.running_jobs.add(rgl);
+                
+            }            
 
             if (allocateNodes <= 0) {
+                ((ComplexGridlet) rgl.getGridlet()).assigned_machines+=machine.getMachineID()+"";
                 break;
             } else {
+                ((ComplexGridlet) rgl.getGridlet()).assigned_machines+=machine.getMachineID()+" ";
                 peIndex += machine.getNumPE();
             }
         }
@@ -912,6 +932,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
         // change Gridlet status        
         rgl.setGridletStatus(Gridlet.INEXEC);
 
+        //System.out.println(rgl.getGridletID()+" started assigned "+PEs.size()+" PEs at time "+Math.round(GridSim.clock()));
         // add this Gridlet into execution list
         gridletInExecList_.add(rgl);
 
@@ -1097,6 +1118,9 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 // generates always pair machine_ID:PE_ID into 2 arrays, these arrays have always the same length
                 super.resource_.setStatusPE(PE.FREE, machines[i], pes[i]);
                 mr.setFirstFreeTimeOnPE(pes[i], GridSim.clock());
+                
+                boolean removed = mr.running_jobs.remove(rgl);
+                //System.out.println("job "+rgl.getGridletID() + " finished ["+mr.getMachineID()+":"+pes[i]+"] ------ and removed: " + removed+" with spec = "+((ComplexGridlet) rgl.getGridlet()).getProperties());
             }
             //System.out.println("----- ("+rgl.getGridletID()+")");
         } else {
@@ -1108,13 +1132,18 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             //System.out.println("ending gridlet "+rgl.getGridletID()+" on machine="+rgl.getMachineID()+" PE="+ rgl.getPEID());
             super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
             mr.setFirstFreeTimeOnPE(rgl.getPEID(), GridSim.clock());
+            
+            boolean removed = mr.running_jobs.remove(rgl);
+            //System.out.println("job "+rgl.getGridletID() + " finished "+mr.getMachineID()+" ------ and removed: " + removed+" with spec = "+((ComplexGridlet) rgl.getGridlet()).getProperties());
+
         }
+
         //System.out.println(rgl.getGridletID()+" finished ------");
         // the order is important! Set the status first then finalize
         // due to timing issues in ResGridlet class
         rgl.setGridletStatus(status);
         rgl.finalizeGridlet();
-        if (status == Gridlet.FAILED_RESOURCE_UNAVAILABLE) {
+        if (status == Gridlet.FAILED_RESOURCE_UNAVAILABLE || status == Gridlet.PAUSED) {
 
             double wall = GridSim.clock() - rgl.getGridletArrivalTime();
             double actual = GridSim.clock() - rgl.getExecStartTime();
@@ -1239,6 +1268,20 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.0, AleaSimTags.FAILURE_START, this.resId_);
             super.sim_schedule(super.myId_, duration, AleaSimTags.FAILURE_FINISHED);
 
+        } else if (ev.get_tag() == AleaSimTags.POLICY_CHECKPOINT) {
+            LinkedList<GridletInfo> checkpointed_jobs = (LinkedList<GridletInfo>) ev.get_data();
+
+            //send those jobs as completed back to Scheduler
+            for (int i = 0; i < checkpointed_jobs.size(); i++) {
+                ComplexGridlet cg = checkpointed_jobs.get(i).getGridlet();
+                for (int j = 0; j < gridletInExecList_.size(); j++) {
+                    ResGridlet rgl = (ResGridlet) gridletInExecList_.get(j);
+                    if (rgl.getGridlet().equals(cg)) {
+                        endCheckpointedGridlet(rgl);
+                        break;
+                    }
+                }
+            }
         } else {
             System.out.println("Unknown tag: " + ev.get_tag());
         }
@@ -1426,6 +1469,47 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
 
         return free;
     }
+
+    private void endCheckpointedGridlet(ResGridlet obj) {
+        double dur = Math.max(0.0, GridSim.clock() - obj.getExecStartTime());
+        double load = getMIShare(dur, obj.getMachineID());
+        obj.updateGridletFinishedSoFar(load);
+        //System.out.println(obj.getGridletID()+ " updated finSoFar by: "+load+ " load at time "+GridSim.clock());
+        gridletInExecList_.remove(obj);
+        gridletFinish(obj, Gridlet.PAUSED);
+        //System.out.println("Checkpointing: " + obj.getGridletID() + " at time: " + GridSim.clock() + " remain: " + obj.getRemainingGridletLength() + " of: " + obj.getGridletLength() + " after dur: " + dur + " freeing " + obj.getNumPE() + " CPUs");
+        // submit it back to Scheduler as new job with a small delay
+        if (ExperimentSetup.requeue) {
+            // either start from checkpoint or restart from start
+            if (ExperimentSetup.use_checkpoint) {
+                // shorten this job according to already used CPU time (start from the checkpoint)
+                ComplexGridlet og = (ComplexGridlet) obj.getGridlet();
+                ComplexGridlet gl = new ComplexGridlet(og.getGridletID(), og.getUser(), Math.round(og.getJobLimit() - dur), Math.round(obj.getRemainingGridletLength()), Math.max(1, (og.getEstimatedLength() - dur)), 0, 0,
+                        "Linux", og.getArchRequired(), og.getArrival_time(), og.getDue_date(), 1, og.getNumPE(), 0.0, og.getQueueID(), og.getProperties(),
+                        og.getPercentage(), og.getRam(), og.getNumNodes(), og.getPpn(), og.getGpus_per_node(), og.getPrecedingJobs(), og.getGroupID());
+
+                // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
+                //System.out.println("[JOB LOADER] Sending job "+id+" from "+gl.getArchRequired()+" to scheduler. Job has limit = "+job_limit+" seconds,  requires "+numNodes+" nodes each with "+ppn+" CPUs [total "+numCPU+" CPUs]. RAM required per node = "+(ram/(1024.0*1024))+" GB. Sim. time = "+GridSim.clock());
+                gl.setUserID(GridSim.getEntityId("Alea_Job_Scheduler"));
+                gl.setPreempted(true);
+                super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.5, AleaSimTags.GRIDLET_INFO, gl);
+            } else {
+                // restart from scratch
+                ComplexGridlet og = (ComplexGridlet) obj.getGridlet();
+                ComplexGridlet gl = new ComplexGridlet(og.getGridletID(), og.getUser(), og.getJobLimit(), obj.getGridletLength(), Math.max(1, (og.getEstimatedLength())), 0, 0,
+                        "Linux", og.getArchRequired(), og.getArrival_time(), og.getDue_date(), 1, og.getNumPE(), 0.0, og.getQueueID(), og.getProperties(),
+                        og.getPercentage(), og.getRam(), og.getNumNodes(), og.getPpn(), og.getGpus_per_node(), og.getPrecedingJobs(), og.getGroupID());
+
+                // and set user id to the Scheduler entity - otherwise it would be returned to the JobLoader when completed.
+                //System.out.println("[JOB LOADER] Sending job "+id+" from "+gl.getArchRequired()+" to scheduler. Job has limit = "+job_limit+" seconds,  requires "+numNodes+" nodes each with "+ppn+" CPUs [total "+numCPU+" CPUs]. RAM required per node = "+(ram/(1024.0*1024))+" GB. Sim. time = "+GridSim.clock());
+                gl.setUserID(GridSim.getEntityId("Alea_Job_Scheduler"));
+                gl.setPreempted(true);
+                super.sim_schedule(GridSim.getEntityId("Alea_Job_Scheduler"), 0.5, AleaSimTags.GRIDLET_INFO, gl);
+            }
+        }
+        //System.out.println("Requeueing: " + gl.getGridletID() + " at time: " + GridSim.clock());
+    }
+
     /*
      * public boolean canExecuteNow(GridletInfo gi){ long ram = gi.getRam(); int
      * numPE = gi.getNumPE(); int ppn = gi.getPpn(); int numNodes =

@@ -258,10 +258,6 @@ public class ExperimentSetup {
      */
     public static double runtime_minimizer;
     /**
-     * defines whether job's RAM requirements should be followed
-     */
-    public static boolean use_RAM;
-    /**
      * defines whether use fairshare based on normalized wait time
      * (tot_wait/tot_runtime)
      */
@@ -477,7 +473,6 @@ public class ExperimentSetup {
         allocate_whole_nodes = aCfg.getBoolean("allocate_whole_nodes");
         arrival_rate_multiplier = aCfg.getDouble("arrival_rate_multiplier");
         runtime_minimizer = aCfg.getDouble("runtime_minimizer");
-        use_RAM = aCfg.getBoolean("use_RAM");
         use_fairshare_WAIT = aCfg.getBoolean("use_fairshare_WAIT");
         use_fairshare_RAM = aCfg.getBoolean("use_fairshare_RAM");
         use_fairshare = aCfg.getBoolean("use_fairshare");

@@ -183,19 +183,11 @@ public class MachineLoader {
             LinkedList Holidays = new LinkedList();
             AllocPolicy apolicy = null;
             try {
-                // this is usefull because we can define resources internal scheduling system (FCFS/RR/BackFilling,FairQueuing...)
-                if (ExperimentSetup.use_RAM) {
-                    AdvancedSpaceSharedWithRAM policy = null;
-                    policy = new AdvancedSpaceSharedWithRAM(name, "AdvancedSpaceSharedPolicyWithRAM", resConfig);
-                    ExperimentSetup.local_schedulers.add(policy);
-                    apolicy = policy;
-
-                } else {
-                    AdvancedSpaceShared policy = null;
-                    policy = new AdvancedSpaceShared(name, "AdvancedSpaceSharedPolicy", resConfig);
-                    ExperimentSetup.local_schedulers.add(policy);
-                    apolicy = policy;
-                }
+                // this is usefull because we can define resources internal scheduling system (FCFS/RR/BackFilling,FairQueuing...)               
+                AdvancedSpaceSharedWithRAM policy = null;
+                policy = new AdvancedSpaceSharedWithRAM(name, "AdvancedSpaceSharedPolicyWithRAM", resConfig);
+                ExperimentSetup.local_schedulers.add(policy);
+                apolicy = policy;
 
             } catch (Exception ex) {
                 ex.printStackTrace();
