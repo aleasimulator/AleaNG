@@ -90,7 +90,7 @@ public class SWFLoader extends GridSim {
 
         folder_prefix = System.getProperty("user.dir");
 
-        System.out.println("Opening job file at: " + folder_prefix + ExperimentSetup.data_sets_dir + data_set );
+        System.out.println("Opening job file at: " + folder_prefix + ExperimentSetup.data_sets_dir + data_set);
         br = r.openFile(new File(folder_prefix + ExperimentSetup.data_sets_dir + data_set));
         this.total_jobs = total_jobs;
         this.maxPE = maxPE;
@@ -193,14 +193,14 @@ public class SWFLoader extends GridSim {
                     }
                     if (line.contains("; number of jobs: ")) {
                         int jobs = Integer.parseInt(line.replace("; number of jobs: ", ""));
-                        if(total_jobs > jobs){
+                        if (total_jobs > jobs) {
                             System.out.println("\n================== !!! WARNING !!! ==================");
-                            System.out.println("AleaNG will read all " + jobs+" jobs from workload file. \n(Shortening the number specified in config: "+total_jobs+" jobs)");
+                            System.out.println("AleaNG will read all " + jobs + " jobs from workload file. \n(Shortening the number specified in config: " + total_jobs + " jobs)");
                             System.out.println("================== !!! WARNING !!! ==================\n");
                             total_jobs = jobs;
-                        }else{
+                        } else {
                             System.out.println("\n================== !!! WARNING !!! ==================");
-                            System.out.println("AleaNG will read only " + total_jobs+" jobs from workload file. \n(Shortening the number specified in file: "+jobs+" jobs)");
+                            System.out.println("AleaNG will read only " + total_jobs + " jobs from workload file. \n(Shortening the number specified in file: " + jobs + " jobs)");
                             System.out.println("================== !!! WARNING !!! ==================\n");
                         }
                     }
@@ -299,7 +299,7 @@ public class SWFLoader extends GridSim {
             ram = 1;
 
         }
-        
+
         long job_limit = 0;
         if (values[8].contains(".")) {
             //System.out.println("old="+values[8]);
@@ -380,11 +380,16 @@ public class SWFLoader extends GridSim {
             if (ExperimentSetup.allocate_whole_nodes) {
                 numNodes = numCPU;
                 ppn = 1;
-            }else{
-                String prop = properties.substring(properties.indexOf(":")+1);
-                String[] spec = prop.split("x");
-                numNodes = Integer.parseInt(spec[0]);
-                ppn = Integer.parseInt(spec[1]);
+            } else {
+                String prop = properties.substring(properties.indexOf(":") + 1);
+                if (!prop.contains("x")) {
+                    numNodes = numCPU;
+                    ppn = 1;
+                } else {
+                    String[] spec = prop.split("x");
+                    numNodes = Integer.parseInt(spec[0]);
+                    ppn = Integer.parseInt(spec[1]);
+                }
             }
 
             // FIX THIS
@@ -437,8 +442,6 @@ public class SWFLoader extends GridSim {
                 System.out.println(id + " ERROR: gpu and gpu_per_node mismatch: " + numNodes + " numNodes, " + gpus + " gpus, " + gpus_per_node + " gpus_per_node.");
             }
         }
-        
-        
 
         // DATA for synthetic experiment
         /*
