@@ -102,7 +102,7 @@ public class TimeSeriesChart extends JFrame {
             yAxis.setRange(0.0, 1.0);
         }
         DateAxis axis = (DateAxis) plot.getDomainAxis();
-        axis.setDateFormatOverride(new SimpleDateFormat("dd-MMM-YY HH:mm", new Locale.Builder().setLanguage("en").setRegion("US").build()));//HH:mm dd-MMM-yy
+        axis.setDateFormatOverride(new SimpleDateFormat("dd-MMM-yy HH:mm", new Locale.Builder().setLanguage("en").setRegion("US").build()));//HH:mm dd-MMM-yy
         axis.setTickLabelFont(new Font("Tahoma", Font.PLAIN, 11));
         axis.setLabelFont(new Font("Tahoma", Font.PLAIN, 11));
         chart.getLegend().setItemFont(new Font("Tahoma", Font.PLAIN, 11));

@@ -3,7 +3,7 @@
 ## Job Scheduling Simulator for Batch Systems
 
 This tool emulates the behavior of classical batch scheduling system such as PBS or Slurm resource managers.
-It allows you to simulate and visualize the behavior of computing clusters.
+It allows you to simulate and visualize the behavior of computing clusters and/or supercomputers (over 1 million CPU cores).
 
 ### Main Features
 
@@ -11,7 +11,8 @@ It allows you to simulate and visualize the behavior of computing clusters.
 * The data sets in SWF format are available at https://jsspp.org/workload/ and http://www.cs.huji.ac.il/labs/parallel/workload/logs.html. 
 * Sample data sets are provided within the distribution (see `./data-set/` and `./example/` directories) but only serve for demonstration purposes.
 * The simulator supports both textual (`csv`) and graphical outputs (`png` and `pdf`).
-* Simulation results are stored in `./results/` directory 
+* Simulation results are stored in `./results/` directory
+* Simulator has been tested to enable truly large simulations (systems having over 1 million CPU cores)
 
 ### Documentation
 Documentation can be found in the https://github.com/aleasimulator/AleaNG/blob/master/readme.pdf file. A **quick start guide is shown below**:

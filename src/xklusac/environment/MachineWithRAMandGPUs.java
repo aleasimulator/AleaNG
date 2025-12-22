@@ -35,12 +35,14 @@ public class MachineWithRAMandGPUs extends Machine {
     //public Hashtable<Integer, Integer> job_gpu_usage = new Hashtable<Integer, Integer>();
     //public Hashtable<Integer, ResGridlet> PE_to_job_mapping = new Hashtable<Integer, ResGridlet>();
     // tells whether this machine is working properly or has failed.
+    private int used_cpus;
     private boolean failed_;
     public ArrayList<ResGridlet> running_jobs = new ArrayList();
     public ArrayList<Capacity> capacity_list = new ArrayList();
     private double est = 0;
     public int banned_PEs = 0;
     public int banned_GPUs = 0;
+    private boolean used_exclusively = false;
 
     /**
      * Allocates a new Machine object
@@ -55,33 +57,53 @@ public class MachineWithRAMandGPUs extends Machine {
         this.used_ram = 0;
         this.gpus = gpus_per_node;
         this.used_gpus = 0;
+        this.used_cpus = 0;
         this.firstFreeTime = new double[list.size()];
         for (int i = 0; i < firstFreeTime.length; i++) {
             firstFreeTime[i] = 0.0;
             //PE_to_job_mapping.put(i, null);
         }
+        this.used_exclusively = false;
+    }
+
+    @Override
+    public int getNumFreePE() {
+        int freePE;
+        if (isUsed_exclusively()) {
+            //System.out.println(this.getMachineID()+ " is used exclusively by "+this.getRunningJobsString()+"");
+            return 0;
+        } else {
+            freePE = Math.max(0, (this.cpus - this.getUsed_cpus()));
+        }
+
+        //return super.getNumFreePE();
+        return freePE;
+    }
+    
+    @Override
+    public int getNumBusyPE(){
+        return this.getUsed_cpus();
     }
 
     public boolean containsJob(ComplexGridlet gr) {
         for (int i = 0; i < running_jobs.size(); i++) {
             ComplexGridlet g = (ComplexGridlet) running_jobs.get(i).getGridlet();
-            if(g.equals(gr)){
-            //if (g.getGridletID() == gr.getGridletID()) {
+            if (g.equals(gr)) {
+                //if (g.getGridletID() == gr.getGridletID()) {
                 return true;
             }
         }
         return false;
     }
-    
-      public String getRunningJobsString() {
-          String jobs = "";
+
+    public String getRunningJobsString() {
+        String jobs = "";
         for (int i = 0; i < running_jobs.size(); i++) {
             ComplexGridlet g = (ComplexGridlet) running_jobs.get(i).getGridlet();
-            jobs+=g.getGridletID()+" ";
+            jobs += g.getGridletID() + " ";
         }
         return jobs;
     }
-
 
     public boolean calculateMachineCapacityInTime(double time) {
         capacity_list.clear();
@@ -103,6 +125,11 @@ public class MachineWithRAMandGPUs extends Machine {
         // add increasing capcities as less jobs are executed
         for (int i = 0; i < running_jobs.size(); i++) {
             g = (ComplexGridlet) running_jobs.get(i).getGridlet();
+            if (isUsed_exclusively()) {
+                // terminate this cycle and only create full capacity AFTER this excl job finishes
+                start = g.getExpectedFinishTime();
+                break;
+            }
             double duration = Math.round(Math.max(0, g.getExpectedFinishTime() - start));
             Capacity capacity = new Capacity(cpu_init, ram_init, gpu_init, start, duration);
             capacity_list.addLast(capacity);
@@ -115,7 +142,7 @@ public class MachineWithRAMandGPUs extends Machine {
         // this is the full capacity after last job finishes
         Capacity full_c = new Capacity(cpus, ram, gpus, start, Double.MAX_VALUE);
         capacity_list.addLast(full_c);
-        //System.out.println("end capacity bigger by:" +g.getPpn()+" == "+full_c.getCpus()+" cap_length="+capacity_list.size());
+        //System.out.println("end capacity = "+full_c.getCpus()+" cap_length="+capacity_list.size());
 
         return true;
     }
@@ -298,6 +325,34 @@ public class MachineWithRAMandGPUs extends Machine {
      */
     public void setEst(double est) {
         this.est = est;
+    }
+
+    /**
+     * @return the used_exclusively
+     */
+    public boolean isUsed_exclusively() {
+        return used_exclusively;
+    }
+
+    /**
+     * @param used_exclusively the used_exclusively to set
+     */
+    public void setUsed_exclusively(boolean used_exclusively) {
+        this.used_exclusively = used_exclusively;
+    }
+
+    /**
+     * @return the used_cpus
+     */
+    public int getUsed_cpus() {
+        return used_cpus;
+    }
+
+    /**
+     * @param used_cpus the used_cpus to set
+     */
+    public void setUsed_cpus(int used_cpus) {
+        this.used_cpus = used_cpus;
     }
 } // end class
 

@@ -86,7 +86,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
     public void body() {
         // Gets the PE's rating for each Machine in the list.
         // Assumed one Machine has same PE rating.
-        MachineList list = super.resource_.getMachineList();
+        AdvancedMachineList list = (AdvancedMachineList) resource_.getMachineList();
         int size = list.size();
         int indexPE = 0;
         machineRating_ = new int[size];
@@ -105,14 +105,15 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             // if the simulation finishes then exit the loop
             if (ev.get_tag() == GridSimTags.END_OF_SIMULATION
                     || super.isEndSimulation() == true) {
-                double mips = resource_.getMIPSRating() * GridSim.clock();
+                //System.out.println("tag: "+ev.get_tag()+ " == "+GridSimTags.END_OF_SIMULATION+" || "+super.isEndSimulation());
+                double mips = resource_.getMIPSRating() * Scheduler.final_makespan;
                 mips -= wfailure_time;
-                double usage = resource_.getNumPE() * GridSim.clock();
+                double usage = resource_.getNumPE() * Scheduler.final_makespan;
                 usage -= failure_time;
 
                 used_mips = Math.round((used_mips / mips) * 10000.0);
                 used_usage = Math.round((used_usage / usage) * 10000.0);
-                System.out.println("Cluster " + resource_.getResourceName() + ": weigh. usage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened jobs due to exceeded runtime limit = " + shortened);
+                System.out.println("Cluster " + resource_.getResourceName() + ": weigh. usage = " + used_mips / 100.0 + "%, usage = " + used_usage / 100.0 + "%, shortened jobs due to exceeded runtime limit = " + shortened + " at time: " + Scheduler.final_makespan);
                 failure_time = 0.0;
                 wfailure_time = 0.0;
                 used_mips = 0.0;
@@ -123,7 +124,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             // failure finished - restart this resource
             if (ev.get_tag() == AleaSimTags.FAILURE_FINISHED) {
                 failed = false;
-                list = super.resource_.getMachineList();
+                list = (AdvancedMachineList) resource_.getMachineList();
                 size = list.size();
                 for (int i = 0; i < size; i++) {
                     list.getMachine(i).setFailed(false);
@@ -146,7 +147,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 Failure failure = (Failure) ev.get_data();
                 mach_failed = false;
                 int[] ids = failure.getIds();
-                list = super.resource_.getMachineList();
+                list = (AdvancedMachineList) resource_.getMachineList();
 
                 int onPEs = 0;
                 double onMIPS = 0.0;
@@ -683,7 +684,8 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
     private boolean allocatePEtoGridlet(ResGridlet rgl) {
         // IDENTIFY MACHINE which has a free PE and add this Gridlet to it.
         MachineWithRAMandGPUs myMachine = null;
-        MachineList mList = resource_.getMachineList();
+        //MachineList mList = resource_.getMachineList();
+        ArrayList mList = new ArrayList<>(resource_.getMachineList());
         //System.out.println(rgl.getGridletID()+" start..."+mList.size());
         int peIndex = -1;
         // gets the list of PEs and find one empty PE
@@ -767,7 +769,8 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
     private boolean allocatePEtoGridletOld(ResGridlet rgl, int numPE) {
         // allocate the gridlet to machine(s) so that the numPE is satisfied
 
-        MachineList machines = resource_.getMachineList();
+        //MachineList machines = resource_.getMachineList();
+        ArrayList machines = new ArrayList<>(resource_.getMachineList());
         int allocate = numPE;
         int peIndex = -1;
         ArrayList<Integer> PEs = new ArrayList();
@@ -861,8 +864,10 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
         int ppn = ((ComplexGridlet) rgl.getGridlet()).getPpn();
         int numNodes = ((ComplexGridlet) rgl.getGridlet()).getNumNodes();
         int gpus = ((ComplexGridlet) rgl.getGridlet()).getGpus_per_node();
+        boolean is_required_exclusive_allocation = ((ComplexGridlet) rgl.getGridlet()).getProperties().contains(":excl");
 
-        MachineList machines = resource_.getMachineList();
+        //MachineList machines = resource_.getMachineList();
+        ArrayList machines = new ArrayList<>(resource_.getMachineList());
         int allocateNodes = numNodes;
         int peIndex = -1;
         ArrayList<Integer> PEs = new ArrayList();
@@ -876,7 +881,7 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
             // cannot use such machine
-            if (machine.getFailed()) {
+            if (machine.getFailed() || machine.isUsed_exclusively()) {
                 peIndex += machine.getNumPE();
                 continue;
             }
@@ -891,10 +896,17 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 continue;
             }
 
+            // new job requires exclusive machine but the machine already runs some job(s)
+            if (is_required_exclusive_allocation && machine.getNumBusyPE() > 0) {
+                peIndex += machine.getNumPE();
+                continue;
+            }
+
             if (machine.getNumFreePE() >= ppn && machine.getFreeRam() >= ram && machine.getFreeGPUs() >= gpus) {
                 allocateNodes--;
                 machine.setUsedRam(machine.getUsedRam() + ram);
                 machine.setUsed_gpus(machine.getUsed_gpus() + gpus);
+                machine.setUsed_cpus(machine.getUsed_cpus() + ppn);
 
                 /*if(machine.banned_PEs>0){
                     System.out.println(rgl.getGridletID()+" Banned PEs are: "+machine.banned_PEs+" and this machine ("+machine.getMachineID()+") is allowed? "+allowed_machine_ids.contains(machine.getMachineID()));
@@ -916,14 +928,19 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 }
                 //machine.job_gpu_usage.put(rgl.getGridletID(), gpus);
                 machine.running_jobs.add(rgl);
-                
-            }            
+                if (is_required_exclusive_allocation) {
+                    //System.out.println(rgl.getGridletID()+" will use machine "+machine.getMachineID()+" exclusively. Curr. have "
+                    //        +machine.getRunningJobsString()+" and gi req. "+((ComplexGridlet) rgl.getGridlet()).getProperties());
+                    machine.setUsed_exclusively(true);
+                }
+
+            }
 
             if (allocateNodes <= 0) {
-                ((ComplexGridlet) rgl.getGridlet()).assigned_machines+=machine.getMachineID()+"";
+                ((ComplexGridlet) rgl.getGridlet()).assigned_machines += machine.getMachineID() + "";
                 break;
             } else {
-                ((ComplexGridlet) rgl.getGridlet()).assigned_machines+=machine.getMachineID()+" ";
+                ((ComplexGridlet) rgl.getGridlet()).assigned_machines += machine.getMachineID() + " ";
                 peIndex += machine.getNumPE();
             }
         }
@@ -1092,9 +1109,13 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
     private void gridletFinish(ResGridlet rgl, int status) {
         //System.out.println(rgl.getGridletID()+ " prave skoncil v case "+Math.round(GridSim.clock())+" on "+GridSim.getEntityName(this.myId_));
         // Set PE on which Gridlet finished to FREE
-        MachineList machinesList = resource_.getMachineList();
+        AdvancedMachineList machinesList = (AdvancedMachineList) resource_.getMachineList();
+        //ArrayList machinesList = new ArrayList<>(resource_.getMachineList());
         long glUsedRam = ((ComplexGridlet) rgl.getGridlet()).getRam();
         int glUsedGPUs = ((ComplexGridlet) rgl.getGridlet()).getGpus_per_node();
+        int glUsedCPUs = ((ComplexGridlet) rgl.getGridlet()).getPpn();
+        int numNodes = ((ComplexGridlet) rgl.getGridlet()).getNumNodes();
+        int node_cpus = 0;
 
         if (rgl.getNumPE() > 1) {
             int[] machines = rgl.getListMachineID();
@@ -1108,6 +1129,9 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                     //System.out.println(mr.getUsedRam()+" more used RAM by "+glUsedRam);
                     mr.setUsedRam(mr.getUsedRam() - glUsedRam);
                     mr.setUsed_gpus(mr.getUsed_gpus() - glUsedGPUs);
+                    mr.setUsed_cpus(mr.getUsed_cpus() - glUsedCPUs);
+
+                    node_cpus = mr.getNumPE();
                     //if(glUsedGPUs>0)System.out.println(mr.getMachineID()+": Freeing GPU on "+this.resName_+" free = "+mr.getFreeGPUs());
                     //System.out.println(mr.getUsedRam()+" less used RAM by "+glUsedRam);
                     //System.out.println(mr.getPercUsedRam()+"% more");
@@ -1118,8 +1142,10 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
                 // generates always pair machine_ID:PE_ID into 2 arrays, these arrays have always the same length
                 super.resource_.setStatusPE(PE.FREE, machines[i], pes[i]);
                 mr.setFirstFreeTimeOnPE(pes[i], GridSim.clock());
-                
+
+                mr.setUsed_exclusively(false);
                 boolean removed = mr.running_jobs.remove(rgl);
+
                 //System.out.println("job "+rgl.getGridletID() + " finished ["+mr.getMachineID()+":"+pes[i]+"] ------ and removed: " + removed+" with spec = "+((ComplexGridlet) rgl.getGridlet()).getProperties());
             }
             //System.out.println("----- ("+rgl.getGridletID()+")");
@@ -1128,11 +1154,14 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             //System.out.println(mr.getPercUsedRam()+"% prev used");
             mr.setUsedRam(mr.getUsedRam() - glUsedRam);
             mr.setUsed_gpus(mr.getUsed_gpus() - glUsedGPUs);
+            mr.setUsed_cpus(mr.getUsed_cpus() - glUsedCPUs);
+            node_cpus = mr.getNumPE();
             //System.out.println(mr.getPercUsedRam()+"% less used");
             //System.out.println("ending gridlet "+rgl.getGridletID()+" on machine="+rgl.getMachineID()+" PE="+ rgl.getPEID());
             super.resource_.setStatusPE(PE.FREE, rgl.getMachineID(), rgl.getPEID());
             mr.setFirstFreeTimeOnPE(rgl.getPEID(), GridSim.clock());
-            
+
+            mr.setUsed_exclusively(false);
             boolean removed = mr.running_jobs.remove(rgl);
             //System.out.println("job "+rgl.getGridletID() + " finished "+mr.getMachineID()+" ------ and removed: " + removed+" with spec = "+((ComplexGridlet) rgl.getGridlet()).getProperties());
 
@@ -1148,6 +1177,18 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
             double wall = GridSim.clock() - rgl.getGridletArrivalTime();
             double actual = GridSim.clock() - rgl.getExecStartTime();
             rgl.getGridlet().setExecParam(wall, actual);
+        }
+
+        // set allocated CPU time (for exclusive jobs that allocate whole nodes)
+        long allocated = 0;
+        boolean was_required_exclusive_allocation = ((ComplexGridlet) rgl.getGridlet()).getProperties().contains(":excl");
+        double actual_runtime = GridSim.clock() - rgl.getExecStartTime();
+        if (was_required_exclusive_allocation) {
+            allocated = Math.round(numNodes * node_cpus * actual_runtime);
+            ((ComplexGridlet) rgl.getGridlet()).setAllocated_cpu_time(allocated);
+        } else {
+            allocated = Math.round(numNodes * ((ComplexGridlet) rgl.getGridlet()).getPpn() * actual_runtime);
+            ((ComplexGridlet) rgl.getGridlet()).setAllocated_cpu_time(allocated);
         }
 
         //super.sendFinishGridlet( rgl.getGridlet() );
@@ -1289,7 +1330,8 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
 
     public void setMachinesFailed(int[] ids, double duration) {
         int prev = this.resource_.getNumFailedMachines();
-        MachineList list = super.resource_.getMachineList();
+        AdvancedMachineList list = resource_.getMachineList();
+        //ArrayList list = new ArrayList<>(resource_.getMachineList());
         int offPEs = 0;
         double offMIPS = 0.0;
         int killed = 0;
@@ -1333,10 +1375,10 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
 
     private int getNumRunning() {
         int running = 0;
-        MachineList mlist = this.resource_.getMachineList();
+        ArrayList mlist = new ArrayList<>(resource_.getMachineList());
 
         for (int i = 0; i < mlist.size(); i++) {
-            Machine m = mlist.getMachine(i);
+            MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.get(i);
             if (m.getFailed() == false) {
                 running += m.getNumPE();
             }
@@ -1426,10 +1468,12 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
         }
         gridletPausedList_.clear();
 
-        MachineList list = super.resource_.getMachineList();
+        //MachineList list = super.resource_.getMachineList();
+        ArrayList list = new ArrayList<>(resource_.getMachineList());
+
         int size = list.size();
         for (int i = 0; i < size; i++) {
-            list.getMachine(i).setFailed(true);
+            ((MachineWithRAMandGPUs) list.get(i)).setFailed(true);
         }
 
         // update number of CPUs
@@ -1442,26 +1486,26 @@ public class AdvancedSpaceSharedWithRAM extends AllocPolicy {
 
     public int getNumFreePE() {
         int free = 0;
-        MachineList mlist = this.resource_.getMachineList();
-        if (ExperimentSetup.failures) {
-            for (int i = 0; i < mlist.size(); i++) {
-                Machine m = mlist.getMachine(i);
-                if (m.getFailed() == false) {
-                    free += m.getNumFreePE();
-                }
+        //MachineList mlist = this.resource_.getMachineList();
+        ArrayList mlist = new ArrayList<>(resource_.getMachineList());
+
+        for (int i = 0; i < mlist.size(); i++) {
+            MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.get(i);
+            if (m.getFailed() == false) {
+                free += m.getNumFreePE();
             }
-        } else {
-            free = this.resource_.getNumFreePE();
         }
+
         return free;
     }
 
     public int getNumFreeGPUs() {
         int free = 0;
-        MachineList mlist = this.resource_.getMachineList();
+        //MachineList mlist = this.resource_.getMachineList();
+        ArrayList mlist = new ArrayList<>(resource_.getMachineList());
 
         for (int i = 0; i < mlist.size(); i++) {
-            MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.getMachine(i);
+            MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.get(i);
             if (m.getFailed() == false) {
                 free += m.getFreeGPUs();
             }

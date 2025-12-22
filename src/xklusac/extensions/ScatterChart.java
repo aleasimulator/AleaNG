@@ -109,7 +109,7 @@ public class ScatterChart extends JFrame {
         }
         //DateAxis axis = (DateAxis) plot.getDomainAxis();
         NumberAxis axis = (NumberAxis) plot.getDomainAxis();
-        //axis.setDateFormatOverride(new SimpleDateFormat("dd-MMM-YY HH:mm", new Locale.Builder().setLanguage("en").setRegion("US").build()));//HH:mm dd-MMM-yy
+        //axis.setDateFormatOverride(new SimpleDateFormat("dd-MMM-yy HH:mm", new Locale.Builder().setLanguage("en").setRegion("US").build()));//HH:mm dd-MMM-yy
         axis.setTickLabelFont(new Font("Tahoma", Font.PLAIN, 11));
         axis.setLabelFont(new Font("Tahoma", Font.PLAIN, 11));
         chart.getLegend().setItemFont(new Font("Tahoma", Font.PLAIN, 11));
@@ -184,8 +184,9 @@ public class ScatterChart extends JFrame {
             for (int a = 0; a < arr_wait.size(); a++) {
                 // use this hack to keep them always ordered
                 long arrival = (Long) arrivals[a];
-                long wait = arr_wait.get(arrivals[a]);
+                long wait = arr_wait.get(arrival);
                 scatterValues.add(arrival, wait/60.0);
+                
 
             }
             dataset.addSeries(scatterValues);

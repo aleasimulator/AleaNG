@@ -143,7 +143,7 @@ public class ResourceInfo {
     TimeSeries series_usage;
     TimeSeries series_used;
 
-    public MachineList reserved_machines = null;
+    public ArrayList reserved_machines = null;
 
     /**
      * Creates a new instance of ResourceInfo with "in schedule" and "on
@@ -221,7 +221,7 @@ public class ResourceInfo {
 
     public String printNodeStatus() {
         String s = "";
-        MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
 
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
@@ -257,7 +257,8 @@ public class ResourceInfo {
     }
 
     public int getNumAvailGpus() {
-        MachineList machines = this.resource.getMachineList();
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
         int gpus = 0;
 
         for (int i = 0; i < machines.size(); i++) {
@@ -274,10 +275,11 @@ public class ResourceInfo {
         int running = 0;
 
         if (ExperimentSetup.failures) {
-            MachineList mlist = this.resource.getMachineList();
+            //MachineList mlist = this.resource.getMachineList();
+            ArrayList mlist = new ArrayList<>(this.resource.getMachineList());
 
             for (int i = 0; i < mlist.size(); i++) {
-                Machine m = mlist.getMachine(i);
+                MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.get(i);
                 if (m.getFailed() == false) {
                     running += m.getNumPE();
                 }
@@ -341,9 +343,9 @@ public class ResourceInfo {
         int numNodes = gi.getNumNodes();
         int GPUs_per_node = gi.getGpus_per_node();
 
-        MachineList machines = this.resource.getMachineList();
+       ArrayList machines = new ArrayList<>(this.resource.getMachineList());
         if (ExperimentSetup.anti_starvation == true) {
-            machines = virt_machines;
+            machines = new ArrayList<>(virt_machines);
         }
         int allocateNodes = numNodes;
         //System.out.println(this.resource.getResourceName()+ " Machines: ");
@@ -390,9 +392,9 @@ public class ResourceInfo {
                 if (cpu_per_m >= ppn && ram <= this.resource.getRamOnOneMachine()) {
                     //System.out.println(gi.getID() + " test of (lichy) job packing: " + gi.getProperties() + " ppn=" + ppn + " node=" + numNodes + " CPU-per-m: " + cpu_per_m);
 
-                    machines = this.resource.getMachineList();
+                    machines = new ArrayList<>(this.resource.getMachineList());
                     if (ExperimentSetup.anti_starvation == true) {
-                        machines = virt_machines;
+                        machines = new ArrayList<>(virt_machines);
                     }
                     allocateNodes = numNodes;
 
@@ -443,9 +445,9 @@ public class ResourceInfo {
                         //System.out.println(gi.getID() + " test of (sudy) job packing: " + gi.getProperties() + " ppn=" + ppn + " node=" + numNodes + " CPU-per-m: " + cpu_per_m);
                         //System.out.println(gi.getID() + " Job packing tested: " + gi.getProperties() + " ppn=" + gi.getPpn() + " node=" + gi.getNumNodes());
 
-                        machines = this.resource.getMachineList();
+                        machines = new ArrayList<>(this.resource.getMachineList());
                         if (ExperimentSetup.anti_starvation == true) {
-                            machines = virt_machines;
+                            machines = new ArrayList<>(virt_machines);
                         }
                         allocateNodes = numNodes;
 
@@ -586,8 +588,9 @@ public class ResourceInfo {
 
     // pouziva se pri stradani - vynuluje rezervace a nastavi stav obrazu stroju podle skutecneho zaplneni
     public void deleteReservations() {
-        MachineList machines = this.resource.getMachineList();
-        virt_machines = new MachineList();
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
+        virt_machines = new AdvancedMachineList();
 
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
@@ -611,17 +614,7 @@ public class ResourceInfo {
         }
     }
 
-    public double computeLocalPE(GridletInfo gi) {
-        long ram = gi.getRam();
-        int ppn = gi.getPpn();
-        int numNodes = gi.getNumNodes();
-
-        MachineList machines = this.resource.getMachineList();
-        MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(0);
-        double PEcpu = ppn / (machine.getNumPE() * 1.0);
-        double PEram = ram / (machine.getRam() * 1.0);
-        return (Math.max(PEcpu, PEram) * machine.getNumPE()) * numNodes;
-    }
+    
 
     public boolean executedHere(GridletInfo gi) {
         if (gi.getOsRequired().contains(this.resource.getResourceName())) {
@@ -639,7 +632,8 @@ public class ResourceInfo {
             int numNodes = gi.getNumNodes();
             int gpus_per_node = gi.getGpus_per_node();
 
-            MachineList machines = this.resource.getMachineList();
+            //MachineList machines = this.resource.getMachineList();
+            ArrayList machines = new ArrayList<>(this.resource.getMachineList());
             int allocateNodes = numNodes;
 
             for (int i = 0; i < machines.size(); i++) {
@@ -676,7 +670,8 @@ public class ResourceInfo {
         int numNodes = gi.getNumNodes();
         int GPUs_per_node = gi.getGpus_per_node();
 
-        MachineList machines = this.resource.getMachineList();
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
         int allocateNodes = numNodes;
 
         for (int i = 0; i < machines.size(); i++) {
@@ -703,7 +698,8 @@ public class ResourceInfo {
      * @return the amount of RAM in KB
      */
     public long getRamOfOneMachine() {
-        MachineList machines = this.resource.getMachineList();
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
             return machine.getRam();
@@ -718,7 +714,8 @@ public class ResourceInfo {
      * @return
      */
     public long getFreeRamOfOneMachine() {
-        MachineList machines = this.resource.getMachineList();
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
             return machine.getFreeRam();
@@ -731,12 +728,31 @@ public class ResourceInfo {
      */
     public int getNumBusyPE() {
         int busy = 0;
-        MachineList mlist = this.resource.getMachineList();
+        //MachineList mlist = this.resource.getMachineList();
+        ArrayList mlist = new ArrayList<>(this.resource.getMachineList());
 
         for (int i = 0; i < mlist.size(); i++) {
-            Machine m = mlist.getMachine(i);
+            MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.get(i);
             if (m.getFailed() == false) {
                 busy += m.getNumBusyPE();
+            }
+        }
+        return busy;
+    }
+
+    public int getNumAllocatedPE() {
+        int busy = 0;
+        //MachineList mlist = this.resource.getMachineList();
+        ArrayList mlist = new ArrayList<>(this.resource.getMachineList());
+
+        for (int i = 0; i < mlist.size(); i++) {
+            MachineWithRAMandGPUs m = (MachineWithRAMandGPUs) mlist.get(i);
+            if (m.getFailed() == false) {
+                if (m.isUsed_exclusively()) {
+                    busy += m.getNumPE();
+                } else {
+                    busy += m.getNumBusyPE();
+                }
             }
         }
         return busy;
@@ -1300,7 +1316,8 @@ public class ResourceInfo {
 
         // first - failed machines must have finishTimeOnPE[peIndex] = MAX_VALUE
         if (ExperimentSetup.failures) {
-            MachineList list = resource.getMachineList();
+            //MachineList list = resource.getMachineList();
+            ArrayList list = new ArrayList<>(this.resource.getMachineList());
             for (int i = 0; i < list.size(); i++) {
                 Machine m = (Machine) list.get(i);
                 if (!m.getFailed()) {
@@ -2267,14 +2284,45 @@ public class ResourceInfo {
         holes.clear();
 
     }
+    
+    public boolean is_running_exclusive_job_blocking_preemption(GridletInfo cg) {
+
+        boolean candidate_exclusive = false;
+        if(cg.getProperties().contains(":excl")){
+            candidate_exclusive = true;
+        }        
+        int candidate_priority = ExperimentSetup.queues.get(cg.getQueue()).getPriority();
+        
+        for (int j = 0; j < resInExec.size(); j++) {
+            GridletInfo gi = (GridletInfo) resInExec.get(j);
+            int running_priority = ExperimentSetup.queues.get(gi.getQueue()).getPriority();
+            boolean running_exclusive = gi.getProperties().contains(":excl");
+            
+            if(running_priority >= candidate_priority && running_exclusive){
+                // running job is exclusive and blocks preemption
+                return true;
+            }
+            if(running_priority >= candidate_priority && candidate_exclusive){
+                // running job cannot be preempted and blocks preemption for this exclusive job
+                return true;
+            }            
+        }
+        return false;
+    }
 
     public LinkedList<GridletInfo> findAndCheckpointJobs(GridletInfo gi, int priority_level) {
 
-        MachineList machines = this.resource.getMachineList();
-        MachineList machines_sorted = new MachineList();
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
+        MachineList machines_sorted = new AdvancedMachineList();
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
             machines_sorted.add(machine);
+        }
+        
+        if(gi.getNumNodes()==this.resource.getNumMachines() && is_running_exclusive_job_blocking_preemption(gi)){
+            System.out.println("Running job blocks preemption... ");
+            return null;
         }
 
         // sort machines such that free machines come first
@@ -2304,6 +2352,12 @@ public class ResourceInfo {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines_sorted.get(i);
             //either use it if machine is free or checkpoint jobs as needed
             //System.out.println(machine.getMachineID() + " DURING machine has " + machine.getNumFreePE() + " free CPUs");
+
+            // exclusive job requires all PEs on a machine
+            if (gi.getProperties().contains(":excl")) {
+                ppn = machine.getNumPE();
+            }
+
             if (machine.getNumFreePE() >= ppn && machine.getFreeRam() >= ram && machine.getFreeGPUs() >= GPUs_per_node) {
                 allocateNodes--;
             } else {
@@ -2314,14 +2368,14 @@ public class ResourceInfo {
                     allocateNodes--;
                     //System.out.println("Jobs to preempt size: "+local_jobs.size());
                     //quick fix for the whole node job scenario only
-                    if (ExperimentSetup.allocate_whole_nodes && local_jobs.size()>0) {
+                    if (ExperimentSetup.all_jobs_allocate_whole_nodes && local_jobs.size() > 0) {
                         GridletInfo to_be_preempted_job = local_jobs.getFirst();
                         //System.out.println("testing: "+to_be_preempted_job.getID());
                         if (to_be_preempted_job.getNumNodes() > allocateNodes) {
                             //System.out.println("Stopping sooner!");
                             //killing such job will free enough resources for whole node jobs so quit now
                             allocateNodes = 0;
-                        }else{
+                        } else {
                             //System.out.println("Job: "+to_be_preempted_job.getID()+" is not sufficient: "+(to_be_preempted_job.getNumNodes() > allocateNodes)+" "+(to_be_preempted_job.getRam() >= ram));
                         }
                     }
@@ -2331,6 +2385,10 @@ public class ResourceInfo {
                 System.out.println("Done: job " + gi.getID() + " needs [" + numNodes + "x" + ppn + "] CPUs, # of required checkpointed jobs: " + checkpointed_jobs.size());
 
                 return checkpointed_jobs;
+            }
+            
+            if(i==machines_sorted.size()-1){
+                System.out.println("No suitable checkpoint available, only "+allocateNodes+" nodes found.");
             }
 
         }
@@ -2348,6 +2406,11 @@ public class ResourceInfo {
         long free_ram = machine.getFreeRam();
         int freePE = machine.getNumFreePE();
         int freeGPUs = machine.getFreeGPUs();
+
+        // exclusive job requires all PEs on a machine
+        if (gi.getProperties().contains(":excl")) {
+            ppn = machine.getNumPE();
+        }
 
         // update available capacity wrt. already checkpointed jobs
         for (int i = 0; i < previously_checkpointed_jobs.size(); i++) {
@@ -2383,6 +2446,8 @@ public class ResourceInfo {
                         added += cg.getGridletID() + "(" + cg.getPpn() + "),";
                         checkpointed_jobs.add(checkpointed_job);
                     }
+                }else{
+                    //System.out.println("Cannot preempt "+checkpointed_job.getID()+" with priority "+ge_p+" on machine: "+machine.getMachineID());
                 }
             }
 
@@ -2454,7 +2519,7 @@ public class ResourceInfo {
         // THIS DOES not work for topology-aware jobs (numnodes, ppn)
         //int index = findFirstFreeSlot(finishTimeOnPE, gi);
         //this.est = finishTimeOnPE[index]; // Earl. Start Time for head of active_scheduling_queue
-        MachineList machines_sorted = getReservationTimeForTopJob(gi);
+        ArrayList machines_sorted = getReservationTimeForTopJob(gi);
         this.est = ((MachineWithRAMandGPUs) machines_sorted.get(gi.getNumNodes() - 1)).getEst();
         //this.usablePEs = findUsablePEs(index, finishTimeOnPE, gi);
 
@@ -2465,9 +2530,10 @@ public class ResourceInfo {
      * New method to espablish a reservation for TOP JOB
      *
      */
-    public MachineList getReservationTimeForTopJob(GridletInfo gi) {
-        MachineList machines = this.resource.getMachineList();
-        MachineList machines_sorted = new MachineList();
+    public ArrayList getReservationTimeForTopJob(GridletInfo gi) {
+        //MachineList machines = this.resource.getMachineList();
+        ArrayList machines = new ArrayList<>(this.resource.getMachineList());
+        ArrayList machines_sorted = new ArrayList<>(new AdvancedMachineList());
 
         long ram = gi.getRam();
         int ppn = gi.getPpn();
@@ -2479,6 +2545,12 @@ public class ResourceInfo {
         //System.out.println(this.resource.getResourceName()+ " Machines: "+machines.size());
         for (int i = 0; i < machines.size(); i++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
+
+            // exclusive job must use all PEs
+            if (gi.getProperties().contains(":excl")) {
+                ppn = machine.getNumPE();
+            }
+
             // cannot use such machine
             if (machine.getFailed() || machine.getNumPE() < ppn) {
                 //System.out.println(gi.getID() + " skipping this machine " + i);
@@ -2512,6 +2584,10 @@ public class ResourceInfo {
         //ban reserved nodes and their CPUs and set their EST time (reservation time)
         for (int b = 0; b < numNodes; b++) {
             MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines_sorted.get(b);
+            // exclusive job must use all PEs
+            if (gi.getProperties().contains(":excl")) {
+                ppn = machine.getNumPE();
+            }
             if (machine.getNumFreePE() > 0) {
                 machine.banned_PEs = ppn;
                 machine.banned_GPUs = GPUs_per_node;
@@ -2525,7 +2601,7 @@ public class ResourceInfo {
     }
 
     public boolean canGridletFitNextToReservation(GridletInfo gi, GridletInfo grsv) {
-        MachineList machines = reserved_machines;
+        ArrayList machines = reserved_machines;
 
         long ram = gi.getRam();
         int ppn = gi.getPpn();
@@ -2543,6 +2619,9 @@ public class ResourceInfo {
             int freePpn = Math.max(0, (machine.getNumFreePE() - machine.banned_PEs));
             int freeGPUs = Math.max(0, (machine.getFreeGPUs() - machine.banned_GPUs));
 
+            if (gi.getProperties().contains(":excl")) {
+                ppn = machine.getNumPE();
+            }
             // cannot use such machine
             if (machine.getFailed() || freePpn < ppn || freeGPUs < GPUs_per_node) {
                 //System.out.println(gi.getID() + " skipping this machine " + i);

@@ -61,6 +61,8 @@ public class ComplexGridlet extends Gridlet {
      * due date (deadline)
      */
     private double due_date;
+    
+    private long allocated_cpu_time = 0l;
     /**
      * gridlet priority
      */
@@ -625,6 +627,20 @@ public class ComplexGridlet extends Gridlet {
      */
     public void setAllowed_machine_ids(LinkedList<Integer> allowed_machine_ids) {
         this.allowed_machine_ids = allowed_machine_ids;
+    }
+
+    /**
+     * @return the allocated_cpu_time
+     */
+    public long getAllocated_cpu_time() {
+        return allocated_cpu_time;
+    }
+
+    /**
+     * @param allocated_cpu_time the allocated_cpu_time to set
+     */
+    public void setAllocated_cpu_time(long allocated_cpu_time) {
+        this.allocated_cpu_time = allocated_cpu_time;
     }
 
 }

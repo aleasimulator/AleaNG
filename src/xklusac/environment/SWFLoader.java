@@ -112,6 +112,8 @@ public class SWFLoader extends GridSim {
 
             Sim_event ev = new Sim_event();
             sim_get_next(ev);
+            
+            //System.out.println("event at time: "+GridSim.clock());
 
             if (ev.get_tag() == AleaSimTags.EVENT_WAKE) {
 
@@ -377,11 +379,19 @@ public class SWFLoader extends GridSim {
                     System.out.println(id + ": numNodes value is wrong, CPUs = " + numCPU + " ppn = " + ppn);
                 }
             }
-            if (ExperimentSetup.allocate_whole_nodes) {
+            if (ExperimentSetup.all_jobs_allocate_whole_nodes) {
                 numNodes = numCPU;
                 ppn = 1;
             } else {
-                String prop = properties.substring(properties.indexOf(":") + 1);
+                if (!ExperimentSetup.enforce_exclusive_node_allocation_if_requested) {
+                    properties = properties.replace(":excl", "");
+                }
+                
+                String prop_string = properties;
+                if (properties.contains(":excl")) {
+                    prop_string = prop_string.replace(":excl", "");
+                }
+                String prop = prop_string.substring(prop_string.indexOf(":") + 1);
                 if (!prop.contains("x")) {
                     numNodes = numCPU;
                     ppn = 1;
@@ -434,7 +444,7 @@ public class SWFLoader extends GridSim {
         String arch = "RISC";
 
         int gpus_per_node;
-        if (ExperimentSetup.allocate_whole_nodes) {
+        if (ExperimentSetup.all_jobs_allocate_whole_nodes) {
             gpus_per_node = gpus / numNodes;
         } else {
             gpus_per_node = gpus / numNodes;

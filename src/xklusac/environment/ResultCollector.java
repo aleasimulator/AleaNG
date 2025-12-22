@@ -52,7 +52,7 @@ public class ResultCollector {
     double job_time = 0.0;
     double avail_time = 0.0;
     //static double failure_time = 0.0;
-    double wjob_time = 0.0;
+    double excl_job_time = 0.0;
     double wavail_time = 0.0;
     //static double wfailure_time = 0.0;
     /**
@@ -178,7 +178,7 @@ public class ResultCollector {
 
         try {
             out.writeString(user_dir + "/Results(" + problem + ").csv", "1/" + data_set
-                    + "\tsubmit.\tcompl.\tkilled\tresp_time\truntime\tsch-cr-time\tmakespan\tweigh_usg\tclass_usg\ttardiness\twait\tsld\tawrt\tawsd\ts_resp\ts_wait\ts_sld\tbounded_sld\tbackfilled\tbackfilledCONS" + headersOfPlugins);
+                    + "\tsubmit.\tcompl.\tkilled\tresp_time\truntime\tsch-cr-time\tmakespan\tallocated_util%\tutilization%\ttardiness\twait\tsld\tawrt\tawsd\ts_resp\ts_wait\ts_sld\tbounded_sld\tbackfilled\tbackfilledCONS" + headersOfPlugins);
             out.writeString(user_dir + "/WGraphs(" + problem + ").csv", waxis);
             out.writeString(user_dir + "/SGraphs(" + problem + ").csv", saxis);
             out.writeString(user_dir + "/RGraphs(" + problem + ").csv", raxis);
@@ -496,7 +496,8 @@ public class ResultCollector {
 
         // utilized time by job
         job_time += gi.getNumPE() * cpu_time;
-        wjob_time += gi.getNumPE() * gridlet_received.getGridletFinishedSoFar();
+        //wjob_time += gi.getNumPE() * gridlet_received.getGridletFinishedSoFar();
+        excl_job_time += gridlet_received.getAllocated_cpu_time();
         flow_time += response;
 
         //interates all plugins and cumulates their value
@@ -585,7 +586,8 @@ public class ResultCollector {
 
         wavail_time = GridSim.clock() * sd.getWav_PEs();
         wavail_time -= sd.getWfailureTime();
-        double wusage = Math.round((wjob_time / wavail_time) * 10000.0);
+        //double wusage = Math.round((excl_job_time / wavail_time) * 10000.0);
+        double wusage = Math.round((excl_job_time / avail_time) * 10000.0);
 
         // successfully completed jobs
         results.add(success);
@@ -649,7 +651,7 @@ public class ResultCollector {
         this.failed = 0;
         this.received = 0;
         this.job_time = 0.0;
-        this.wjob_time = 0.0;
+        this.excl_job_time = 0.0;
         this.tardiness = 0.0;
         this.succ_flow = 0.0;
         this.succ_slow = 0.0;
@@ -1000,13 +1002,16 @@ public class ResultCollector {
 
     public void recordClusterUsage(double time) {
         int busy = 0;
+        int allocated = 0;
         int running = 0;
         Date date = new java.util.Date(Math.round(GridSim.clock() + Scheduler.start_date) * 1000);
         for (int i = 0; i < resourceInfoList.size(); i++) {
             ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
             int b = ri.getNumBusyPE();
+            int a = ri.getNumAllocatedPE();
             int r = ri.getNumRunningPE();
             busy += b;
+            allocated += a;
             running += r;
             //u.series_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((u.getCumul_usage() + u.getRunningUsage()) / 36.0) / 100.0);
             ri.series_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((b / (r / 100.0)) * 100) / 100.0);
@@ -1014,5 +1019,6 @@ public class ResultCollector {
 
         }
         Scheduler.series_system_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((busy / (running / 100.0)) * 100) / 100.0);
+        Scheduler.series_alloc_usage.addOrUpdate(new Minute(date, TimeZone.getDefault(), Locale.getDefault()), Math.round((allocated / (running / 100.0)) * 100) / 100.0);
     }
 }

@@ -55,6 +55,17 @@ public class ComplexResourceCharacteristics extends ResourceCharacteristics {
         //this.setCpu_ids_string(cpu_ids);
     }
 
+    /**
+     * Gets the list of machines in a resouce
+     * @return a MachineList object
+     * @see gridsim.MachineList
+     * @pre $none
+     * @post $result != null
+     */
+    public AdvancedMachineList getMachineList() {
+        return (AdvancedMachineList) super.getMachineList();
+    }
+    
     public long getRamOnOneMachine() {
         return ramOnOneMachine;
     }

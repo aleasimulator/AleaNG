@@ -102,7 +102,7 @@ public class MachineLoader {
             int totalMachine = Integer.parseInt(values[2]);
             int totalPE = Integer.parseInt(values[3]);
 
-            if (ExperimentSetup.allocate_whole_nodes) {
+            if (ExperimentSetup.all_jobs_allocate_whole_nodes) {
                 totalPE = 1;
             }
             int peRating = Integer.parseInt(values[4]);
@@ -134,10 +134,10 @@ public class MachineLoader {
             //    A Machine contains one or more PEs or CPUs. Therefore, should
             //    create an object of PEList to store these PEs before creating
             //    a Machine.
-            MachineList mList = new MachineList();
+            AdvancedMachineList mList = new AdvancedMachineList();
             for (int m = 0; m < totalMachine; m++) {
 
-                PEList peList = new PEList();
+                AdvancedPEList peList = new AdvancedPEList();
                 for (int k = 0; k < totalPE; k++) {
                     // need to store PE id and MIPS Rating
                     peList.add(new PE(k, peRating));

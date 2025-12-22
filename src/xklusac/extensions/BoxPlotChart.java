@@ -69,6 +69,8 @@ public class BoxPlotChart extends JFrame {
         renderer.setUseOutlinePaintForWhiskers(false);
         renderer.setFillBox(true);
         renderer.setMeanVisible(true);
+        renderer.setMaxOutlierVisible(true);
+        renderer.setMinOutlierVisible(true);
 
         //renderer.setSeriesPaint(4, Color.ORANGE);
         /*renderer.setSeriesPaint(0, Color.darkGray);

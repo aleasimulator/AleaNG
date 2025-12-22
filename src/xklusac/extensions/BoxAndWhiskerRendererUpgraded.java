@@ -81,11 +81,10 @@ import org.jfree.chart.renderer.Outlier;
 import org.jfree.chart.renderer.OutlierList;
 import org.jfree.chart.renderer.OutlierListCollection;
 import org.jfree.chart.renderer.category.AbstractCategoryItemRenderer;
-import org.jfree.chart.renderer.category.BoxAndWhiskerRenderer;
 import org.jfree.chart.renderer.category.CategoryItemRendererState;
 import org.jfree.chart.ui.RectangleEdge;
-import org.jfree.chart.util.PaintUtils;
 import org.jfree.chart.util.Args;
+import org.jfree.chart.util.PaintUtils;
 import org.jfree.chart.util.PublicCloneable;
 import org.jfree.chart.util.SerialUtils;
 import org.jfree.data.Range;
@@ -525,10 +524,79 @@ public class BoxAndWhiskerRendererUpgraded extends AbstractCategoryItemRenderer
      *
      * @return The range.
      */
-    @Override
+    /*@Override
     public Range findRangeBounds(CategoryDataset dataset) {
         return super.findRangeBounds(dataset, true);
+    }*/
+    
+    @Override
+    public Range findRangeBounds(CategoryDataset dataset) {
+        // 1. Get the range calculated by the default logic (whiskers & outliers)
+        Range baseRange = super.findRangeBounds(dataset);
+
+        // Safety check: ensure dataset is the correct type
+        if (!(dataset instanceof BoxAndWhiskerCategoryDataset)) {
+            return baseRange;
+        }
+
+        BoxAndWhiskerCategoryDataset bwDataset = (BoxAndWhiskerCategoryDataset) dataset;
+        
+        // Initialize min/max with the existing base range
+        double min = (baseRange != null) ? baseRange.getLowerBound() : Double.POSITIVE_INFINITY;
+        double max = (baseRange != null) ? baseRange.getUpperBound() : Double.NEGATIVE_INFINITY;
+        boolean updated = false;
+
+        // 2. Iterate through all items to check the Mean values
+        int rowCount = bwDataset.getRowCount();
+        int colCount = bwDataset.getColumnCount();
+
+        for (int r = 0; r < rowCount; r++) {
+            for (int c = 0; c < colCount; c++) {
+                // Use the interface method directly
+                Number mean = bwDataset.getMeanValue(r, c);
+                
+                if (mean != null) {
+                    double meanValue = mean.doubleValue();
+                    
+                    // Expand the min/max if the mean is outside
+                    if (meanValue < min) {
+                        min = meanValue;
+                        updated = true;
+                    }
+                    if (meanValue > max) {
+                        max = meanValue;
+                        updated = true;
+                    }
+                }
+                
+                Number q3 = bwDataset.getMaxRegularValue(r, c);
+                
+                if (q3 != null) {
+                    double q3Value = q3.doubleValue();
+                    
+                    // Expand the min/max if the mean is outside
+                    if (q3Value < min) {
+                        min = q3Value;
+                        updated = true;
+                    }
+                    if (q3Value > max) {
+                        max = q3Value;
+                        updated = true;
+                    }
+                }
+                
+                
+            }
+        }
+
+        // 3. Return the new expanded range
+        if (baseRange == null) {
+             return (updated) ? new Range(min, max) : null;
+        }
+        
+        return new Range(min, max);
     }
+
 
     /**
      * Initialises the renderer. This method gets called once at the start of
@@ -903,7 +971,7 @@ public class BoxAndWhiskerRendererUpgraded extends AbstractCategoryItemRenderer
                 System.out.println("------------------------------------------");
             }
             System.out.println("bin: " + row + " dataset: " + column + " avg: " + Math.round(yMean.doubleValue() * 10.0) / 10.0 + " "
-                    + "hours, minOut|min|q1|med|q3|max|maxOut: "
+                    + ", minOut|min|q1|med|q3|max|maxOut: "
                     + ""+Math.round(yMinOut.doubleValue() * 10.0) / 10.0 + " < "
                     + "|--- "+Math.round(yMin.doubleValue() * 10.0) / 10.0 + ""
                     + "||"+Math.round(yQ1.doubleValue() * 10.0) / 10.0 + " "

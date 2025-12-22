@@ -101,7 +101,7 @@ public class FairshareAggressiveBackfillingPreempt implements SchedulingPolicy {
                     for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                         ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
                         if (Scheduler.isSuitable(ri, gi)) {
-                            System.out.println("====== find preemptable jobs for: " + gi.getID()+" from "+gi.getQueue()+" at position "+i);
+                            System.out.println("====== find preemptable jobs for: " + gi.getID()+" ["+ gi.getNumNodes()+ "x"+gi.getPpn()+"] from "+gi.getQueue()+" at position "+i);
                             LinkedList<GridletInfo> checkpointed_jobs = ri.findAndCheckpointJobs(gi, gridlet_priority_level);
                             //System.out.println("=========end of finding==========");
                             boolean success = false;

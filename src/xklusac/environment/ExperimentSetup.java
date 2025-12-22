@@ -108,6 +108,7 @@ public class ExperimentSetup {
      * set true to use failure trace - if available
      */
     static boolean failures;
+    static boolean enforce_exclusive_node_allocation_if_requested = false;
     /**
      * set true to use avg. job length as an runtime estimate
      */
@@ -247,7 +248,7 @@ public class ExperimentSetup {
      */
     public static boolean use_speeds;
     public static boolean enforce_partition;
-    public static boolean allocate_whole_nodes;
+    public static boolean all_jobs_allocate_whole_nodes;
     /**
      * can be used to compress job inter-arrival times (1.0 = original, 2.0 =
      * twice that fast)
@@ -470,7 +471,7 @@ public class ExperimentSetup {
         chart_height = aCfg.getInt("chart_height");
         use_speeds = aCfg.getBoolean("use_speeds");
         enforce_partition = aCfg.getBoolean("enforce_partition");
-        allocate_whole_nodes = aCfg.getBoolean("allocate_whole_nodes");
+        all_jobs_allocate_whole_nodes = aCfg.getBoolean("all_jobs_allocate_whole_nodes");
         arrival_rate_multiplier = aCfg.getDouble("arrival_rate_multiplier");
         runtime_minimizer = aCfg.getDouble("runtime_minimizer");
         use_fairshare_WAIT = aCfg.getBoolean("use_fairshare_WAIT");
@@ -560,6 +561,8 @@ public class ExperimentSetup {
 
         // set true to use failures
         failures = aCfg.getBoolean("failures");
+        
+        enforce_exclusive_node_allocation_if_requested = aCfg.getBoolean("enforce_exclusive_node_allocation_if_requested");
 
         // set true to use runtime estimates
         //estimates = aCfg.getBoolean("estimates");
@@ -1019,7 +1022,7 @@ public class ExperimentSetup {
                         }
 
                         // creates all grid resources
-                        MachineLoader m_loader = new MachineLoader(10000, 3.0, data_sets[set]);
+                        MachineLoader m_loader = new MachineLoader(2e11, 3.0, data_sets[set]);
                         rnd_seed = sel_alg;
                         System.out.println("The system has " + Math.round(avail_CPUs) + " CPUs and " + Math.round(avail_RAM / (1024 * 1024)) + " GBs of RAM.");
 
@@ -1035,6 +1038,8 @@ public class ExperimentSetup {
                         System.out.println("Now scheduling " + total_gridlet[set] + " jobs by: " + suff + ", using " + data_sets[set] + " data set.");
                         // start the simulation
                         System.out.println("Starting simulation using Alea " + alea_version);
+                        
+                        
 
                         GridSim.startGridSimulation();
                     } catch (Exception e) {

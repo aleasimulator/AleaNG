@@ -166,5 +166,9 @@ public class AleaSimTags {
      * Event sent by resource info class, proccessed by AllocationPolicy.
      */
     public static final int POLICY_CHECKPOINT = TAG_BASE + 1983;
+    
+    public static final int RESOURCE_INIT_DONE = TAG_BASE + 1984;
+    
+    public static final int RESOURCE_INIT_WAIT = TAG_BASE + 1985;
 
 }

@@ -16,6 +16,8 @@ import xklusac.environment.ResourceInfo;
 import xklusac.environment.Scheduler;
 import xklusac.environment.User;
 import xklusac.extensions.FairshareFactorAndJobIDComparator;
+import xklusac.extensions.FairshareFactorAndJobSizeComparator;
+//import xklusac.extensions.FairshareFactorAndJobIDComparator;
 
 /**
  * Class FairshareFCFS<p>
@@ -42,12 +44,12 @@ public class FairshareStrictOrderingPreempt implements SchedulingPolicy {
         LinkedList queue = Scheduler.all_queues.get(index);
         queue.addLast(gi);
         Scheduler.runtime += (new Date().getTime() - runtime1);
-        //System.out.println(gi.getID()+" job has been received and added to queue "+Scheduler.all_queues_names.get(index)+" while requesting "+gi.getQueue());
+        //System.out.println(gi.getID()+" job has been received and added to queue "+Scheduler.all_queues_names.get(index)+" while requesting "+gi.getQueue()+" at time: "+GridSim.clock());
     }
 
     @Override
     public int selectJob() {
-        //System.out.println("Selecting job by fairFCFS...");
+        //System.out.println("Selecting job by fairFCFS... time:"+GridSim.clock());
         int scheduled = 0;
         ResourceInfo r_cand = null;
         //System.out.println("----------------------");
@@ -60,6 +62,7 @@ public class FairshareStrictOrderingPreempt implements SchedulingPolicy {
                 scheduler.resetTemporaryUsageAndUpdateFF();
                 System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
                 Collections.sort(Scheduler.active_scheduling_queue, new FairshareFactorAndJobIDComparator());
+                //Collections.sort(Scheduler.active_scheduling_queue, new FairshareFactorAndJobSizeComparator());
                 /*if (Scheduler.active_scheduling_queue.size() > 0 && ExperimentSetup.users.size()>1) {
                     System.out.print("User_A > User_B "+(ExperimentSetup.users.get("User_A").getFairshare_factor()>ExperimentSetup.users.get("User_B").getFairshare_factor()));
                     System.out.print(" | User_A ff: "+ExperimentSetup.users.get("User_A").getFairshare_factor()+" User_B ff: "+ExperimentSetup.users.get("User_B").getFairshare_factor());
@@ -121,7 +124,7 @@ public class FairshareStrictOrderingPreempt implements SchedulingPolicy {
                     // set the resource ID for this gridletInfo (this is the final scheduling decision)
                     gi.setResourceID(r_cand.resource.getResourceID());
 
-                    System.out.println(Scheduler.all_queues_names.get(q) + " schedules job: " + gi.getID() + " at time: " + GridSim.clock());
+                    System.out.println(Scheduler.all_queues_names.get(q) + " schedules job: " + gi.getID() + "["+gi.getNumNodes()+"x"+gi.getPpn()+"] at time: " + GridSim.clock());
                     User u = ExperimentSetup.users.get(gi.getUser());
                     u.setQueued_jobs(u.getQueued_jobs() - 1);
                     //u.setStarted_jobs(u.getStarted_jobs()+1);
@@ -149,9 +152,9 @@ public class FairshareStrictOrderingPreempt implements SchedulingPolicy {
                     return scheduled;
                 } else {
                     // no backfill, this is STRICT ORDERING (FCFS like algorithm)       
-                    if (q == 0) {
-                        //System.out.println(Scheduler.all_queues_names.get(q) + " STOPPED waiting job: " + gi.getID() + " at time: " + GridSim.clock());
-                    }
+                    //if (q == 0) {
+                        System.out.println(Scheduler.all_queues_names.get(q) + " STOPPED waiting job: " + gi.getID() + "["+gi.getNumNodes()+"x"+gi.getPpn()+"] at time: " + GridSim.clock());
+                    //}
                     return scheduled;
                 }
             }

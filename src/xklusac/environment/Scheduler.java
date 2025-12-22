@@ -1,6 +1,7 @@
 package xklusac.environment;
 
 import alea.core.AleaSimTags;
+import eduni.simjava.Sim_entity;
 import eduni.simjava.Sim_event;
 import gridsim.*;
 import java.io.IOException;
@@ -32,6 +33,8 @@ public class Scheduler extends GridSim {
     private LinkedList resList;
 
     public static String scheduling_algorithm = "";
+    
+    public static double final_makespan = 0.1;
 
     /**
      * list of ResourceInfo objects
@@ -499,6 +502,7 @@ public class Scheduler extends GridSim {
     int last_job_id = 0;
     public static long start_date = -1;
     static TimeSeries series_system_usage;
+    static TimeSeries series_alloc_usage;
 
     /**
      * auxiliary variable
@@ -567,6 +571,7 @@ public class Scheduler extends GridSim {
         users_jobs.clear();
         users_P_jobs.clear();
         series_system_usage = new TimeSeries("System Usage %");
+        series_alloc_usage = new TimeSeries("System Allocated %");
     }
 
     /**
@@ -581,16 +586,23 @@ public class Scheduler extends GridSim {
      */
     public void body() {
 
-        // we get grid resource info - list, counts etc.
-        while (true) {
-            // need to pause for a while to wait GridResources finish
-            // registering to GIS
-            super.gridSimHold(10.0);    // hold by 10 second
+        send(this.get_id(), 10.0, AleaSimTags.RESOURCE_INIT_WAIT);
 
-            resList = super.getGridResourceList();
+        // Accept events until the simulation is finished
+        while (!end_of_submission || received < in_job_counter) {
 
-            resourceInfoList = new ArrayList();
-            if (resList.size() > 0) {
+            Sim_event ev = new Sim_event();
+            sim_get_next(ev);
+
+            if (ev.get_tag() == AleaSimTags.RESOURCE_INIT_WAIT) {
+                System.out.println("Start Scheduler at: " + GridSim.clock() + " sending RESOURCE_INIT_DONE with a delay of 2 seconds.");
+                super.sim_schedule(GridSim.getEntityId(this.getEntityName()), 2.0, AleaSimTags.RESOURCE_INIT_DONE);
+
+                resList = super.getGridResourceList();
+
+                resourceInfoList = new ArrayList();
+
+                //System.out.println("Current time: " + GridSim.clock());
                 totalResource = resList.size();
                 System.out.println("GridResource/Cluster count: " + totalResource);
                 resourceID = new int[totalResource];
@@ -601,55 +613,72 @@ public class Scheduler extends GridSim {
                 classic_availPEs = 0.0;
 
                 for (i = 0; i < totalResource; i++) {
+                    //System.out.println(i + ": Current time: " + GridSim.clock());
                     // Resource list contains list of resource IDs
                     resourceID[i] = ((Integer) resList.get(i)).intValue();
                     // get their names as well
                     resourceName[i] = GridSim.getEntityName(resourceID[i]);
                     int res_id = ((Integer) resList.get(i)).intValue();
                     // Get Resource Characteristic Info
-                    ComplexResourceCharacteristics res = (ComplexResourceCharacteristics) super.getResourceCharacteristics(res_id);
-                    ResourceInfo ri = new ResourceInfo(res);
+                    //ComplexResourceCharacteristics res = (ComplexResourceCharacteristics) super.getResourceCharacteristics(res_id);
+                    Sim_entity entity = eduni.simjava.Sim_system.get_entity(res_id);
 
-                    // increase number of available PEs
-                    availPEs += ri.resource.getNumPE() * ri.resource.getMIPSRatingOfOnePE();
-                    classic_availPEs += ri.resource.getNumPE();
-                    availCPUS += ri.resource.getNumPE();
-                    if (ri.resource.getMIPSRatingOfOnePE() > maxPE) {
-                        maxPE = ri.resource.getMIPSRatingOfOnePE();
-                    }
-                    // store machines according CPU count and their performance
-                    if (resourceInfoList.size() > 0) {
-                        for (int j = 0; j < resourceInfoList.size(); j++) {
-                            ResourceInfo rj = (ResourceInfo) resourceInfoList.get(j);
-                            if (ri.resource.getNumPE() >= rj.resource.getNumPE()) {
-                                if (ri.resource.getNumPE() == rj.resource.getNumPE() && ri.resource.getMIPSRatingOfOnePE() > rj.resource.getMIPSRatingOfOnePE()) {
-                                    resourceInfoList.add(j, ri);
-                                    cl_names.add(j, ri.resource.getResourceName());
-                                    cl_CPUs.add(j, ri.resource.getNumPE());
-                                    break;
-                                }
-                                if (ri.resource.getNumPE() > rj.resource.getNumPE()) {
-                                    resourceInfoList.add(j, ri);
-                                    cl_names.add(j, ri.resource.getResourceName());
-                                    cl_CPUs.add(j, ri.resource.getNumPE());
-                                    break;
-                                }
-                            }
-                            if (j == resourceInfoList.size() - 1) {
-                                resourceInfoList.add(ri);
-                                cl_names.add(ri.resource.getResourceName());
-                                cl_CPUs.add(ri.resource.getNumPE());
-                                break;
-                            }
+// 2. Cast it to a GridResource (assuming your resources are GridResources)
+                    if (entity instanceof GridResource) {
+                        GridResource gridRes = (GridResource) entity;
+
+                        // 3. Get the characteristics directly from the object field
+                        ResourceCharacteristics rawChar = gridRes.getResourceCharacteristics();
+
+                        // 4. Cast to your specific type
+                        ComplexResourceCharacteristics res = (ComplexResourceCharacteristics) rawChar;
+
+                        // Continue as normal...
+                        ResourceInfo ri = new ResourceInfo(res);
+                        
+                        // increase number of available PEs
+                        availPEs += ri.resource.getNumPE() * ri.resource.getMIPSRatingOfOnePE();
+                        classic_availPEs += ri.resource.getNumPE();
+                        availCPUS += ri.resource.getNumPE();
+                        if (ri.resource.getMIPSRatingOfOnePE() > maxPE) {
+                            maxPE = ri.resource.getMIPSRatingOfOnePE();
                         }
-                    } else {
-                        resourceInfoList.add(ri);
-                        cl_names.add(ri.resource.getResourceName());
-                        cl_CPUs.add(ri.resource.getNumPE());
+                        // store machines according CPU count and their performance
+                        if (resourceInfoList.size() > 0) {
+                            for (int j = 0; j < resourceInfoList.size(); j++) {
+                                ResourceInfo rj = (ResourceInfo) resourceInfoList.get(j);
+                                if (ri.resource.getNumPE() >= rj.resource.getNumPE()) {
+                                    if (ri.resource.getNumPE() == rj.resource.getNumPE() && ri.resource.getMIPSRatingOfOnePE() > rj.resource.getMIPSRatingOfOnePE()) {
+                                        resourceInfoList.add(j, ri);
+                                        cl_names.add(j, ri.resource.getResourceName());
+                                        cl_CPUs.add(j, ri.resource.getNumPE());
+                                        break;
+                                    }
+                                    if (ri.resource.getNumPE() > rj.resource.getNumPE()) {
+                                        resourceInfoList.add(j, ri);
+                                        cl_names.add(j, ri.resource.getResourceName());
+                                        cl_CPUs.add(j, ri.resource.getNumPE());
+                                        break;
+                                    }
+                                }
+                                if (j == resourceInfoList.size() - 1) {
+                                    resourceInfoList.add(ri);
+                                    cl_names.add(ri.resource.getResourceName());
+                                    cl_CPUs.add(ri.resource.getNumPE());
+                                    break;
+                                }
+                            }
+                        } else {
+                            resourceInfoList.add(ri);
+                            cl_names.add(ri.resource.getResourceName());
+                            cl_CPUs.add(ri.resource.getNumPE());
+                        }
+                        //System.out.println(i + ": end Current time: " + GridSim.clock());
                     }
                 }
                 ResourceInfo best = (ResourceInfo) resourceInfoList.get(0);
                 bestMachine = best.resource.getMIPSRatingOfOnePE();
+                //System.out.println("Current time: " + GridSim.clock());
 
                 //System.out.println(perm_rnd.nextDouble() + " next");
                 System.out.println("=======================================================================================================");
@@ -660,48 +689,46 @@ public class Scheduler extends GridSim {
                     System.out.println("id = " + ri.resource.getResourceID() + ", name = " + ri.resource.getResourceName() + ", CPUs = " + ri.resource.getNumPE() + ", CPU rating = "
                             + ri.resource.getMIPSRatingOfOnePE() + ", nodes = " + ri.resource.getNumMachines() + ", props = " + ri.resource.getProperties() + ", RAM = " + (ri.resource.getRamOnOneMachine() / (1024.0 * 1024)) + " GB per node, GPUs = " + ri.getNumAvailGpus());
                 }
-                System.out.println("Total available MIPS power = " + availPEs + " MIPS in " + classic_availPEs + " CPUs and machines = " + total_machines);
+                System.out.println("Total available MIPS power = " + availPEs + " MIPS in " + classic_availPEs + " CPUs, total machines = " + total_machines);
                 System.out.println("=======================================================================================================");
                 System.out.println("");
+                //System.out.println("Current time: " + GridSim.clock());
                 wav_PEs = availPEs;
                 av_PEs = classic_availPEs;
+                continue;
+            }
 
+            if (ev.get_tag() == AleaSimTags.RESOURCE_INIT_DONE) {
+                System.out.println("RESOURCE_INIT_DONE Finished at t=" + GridSim.clock());
                 // start periodical logging of results and visualization
                 if (visualize) {
                     super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_COLLECT);
                 }
                 // start periodical optimization of schedule
                 super.sim_schedule(GridSim.getEntityId(this.getEntityName()), 300.0, AleaSimTags.EVENT_OPTIMIZE);
-                break; // break when we have the resource-related information
+                // start the FailureLoader
+                if (failures) {
+                    super.sim_schedule(this.getEntityId(data_set + "_FailureLoader"), 0.0, AleaSimTags.EVENT_WAKE);
+                }
+                // start the JobLoader
+                System.out.println("Wake JOB LOADER up event at time: " + GridSim.clock());
+                super.sim_schedule(this.getEntityId(data_set + "_JobLoader"), 5.0, AleaSimTags.EVENT_WAKE);
 
+                // periodic logging of current throughput (# of jobs completed so far)
+                super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
+                //super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_PRINT_SCHEDULE);
+
+                // fairshare algorithm
+                if (ExperimentSetup.use_fairshare) {
+                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.FAIRSHARE_UPDATE);
+                }
+
+                // periodic decrease of old fairshare weights
+                if (ExperimentSetup.use_decay && ExperimentSetup.use_fairshare) {
+                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.FAIRSHARE_WEIGHT_DECAY);
+                }
+                continue;
             }
-        } //end while
-        // start the FailureLoader
-        if (failures) {
-            super.sim_schedule(this.getEntityId(data_set + "_FailureLoader"), 0.0, AleaSimTags.EVENT_WAKE);
-        }
-        // start the JobLoader
-        super.sim_schedule(this.getEntityId(data_set + "_JobLoader"), 5.0, AleaSimTags.EVENT_WAKE);
-
-        // periodic logging of current throughput (# of jobs completed so far)
-        super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_PRINT_THROUGHPUT);
-        //super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.SCHEDULER_PRINT_SCHEDULE);
-
-        // fairshare algorithm
-        if (ExperimentSetup.use_fairshare) {
-            super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.FAIRSHARE_UPDATE);
-        }
-
-        // periodic decrease of old fairshare weights
-        if (ExperimentSetup.use_decay && ExperimentSetup.use_fairshare) {
-            super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.FAIRSHARE_WEIGHT_DECAY);
-        }
-
-        // Accept events until the simulation is finished
-        while (!end_of_submission || received < in_job_counter) {
-
-            Sim_event ev = new Sim_event();
-            sim_get_next(ev);
 
             if (ev.get_tag() == AleaSimTags.SCHEDULER_PRINT_FIRST_JOB_IN_QUEUE) {
                 if (this.all_queues.getFirst().size() > 0) {
@@ -891,8 +918,8 @@ public class Scheduler extends GridSim {
             if (ev.get_tag() == GridSimTags.GRIDLET_RETURN) {
                 ComplexGridlet gridlet_received = (ComplexGridlet) ev.get_data();
                 //System.out.println("Gridlet: " + gridlet_received.getGridletID() + " returned to Scheduler, status: " + gridlet_received.getGridletStatusString() + " at time: " + GridSim.clock());
-                if(gridlet_received.getGridletStatus() == Gridlet.PAUSED){
-                    this.waiting_for_preempted_job_to_arrive = false;    
+                if (gridlet_received.getGridletStatus() == Gridlet.PAUSED) {
+                    this.waiting_for_preempted_job_to_arrive = false;
                 }
                 // remove job from schedule on resource
                 for (int j = 0; j < resourceInfoList.size(); j++) {
@@ -1087,7 +1114,7 @@ public class Scheduler extends GridSim {
                     //String dated = new java.text.SimpleDateFormat("dd-MM-yyyy").format(new java.util.Date(Math.round(clock()) * 1000));
                     String dated = new java.text.SimpleDateFormat("dd-MM-yyyy [HH:mm]").format(new java.util.Date(Math.round(clock() + Scheduler.start_date) * 1000));
 
-                    System.out.println("<<< " + received + " completed, in queue/schedule " + getQueueSize() + " jobs, requiring " + getQueueCPUSize()
+                    System.out.println("<<< " + received + " completed so far, in queue/schedule " + getQueueSize() + " jobs, requiring " + getQueueCPUSize()
                             + " CPUs, held jobs " + hold_queue.size() + " running " + getRunningJobs()
                             + " jobs, free CPUs " + getFreeCPUs() + ", free RAM " + Math.round(getFreeRAM() / (1024.0 * 1024)) + " GB, free GPUs " + getFreeGPUs() + ", "
                             + "tried jobs " + tried_queue.size() + ", Day: " + dated + " SimClock: " + Math.round(clock()));
@@ -1119,7 +1146,7 @@ public class Scheduler extends GridSim {
                      * scheduleGridlets(); Date dd2 = new Date(); clock2 =
                      * dd2.getTime(); clock += clock2 - clock1;
                      */
-                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE, "completed job:"+gridlet_received.getGridletID());
+                    super.sim_schedule(this.getEntityId(this.getEntityName()), 0.0, AleaSimTags.EVENT_SCHEDULE, "completed job:" + gridlet_received.getGridletID());
                 }
 
                 // null gridlet to allow garbage collection
@@ -1232,7 +1259,7 @@ public class Scheduler extends GridSim {
                     //String dated = new java.text.SimpleDateFormat("dd-MM-yyyy-hh:mm:ss").format(new java.util.Date(Math.round(clock()) * 1000));
                     String dated = new java.text.SimpleDateFormat("dd-MM-yyyy [HH:mm]").format(new java.util.Date(Math.round(clock() + Scheduler.start_date) * 1000));
                     //System.out.println(">>> " + in_job_counter + " so far arrived, in active_scheduling_queue = " + getQueueSize() + " jobs, at time = " + Math.round(clock()) + " running = " + getRunningJobs() + " jobs, free CPUs = " + getFreeCPUs() + ", #" + active_scheduling_queue.getFirst().getID() + " is the first waiting job in active_scheduling_queue. Day: " + dated);
-                    System.out.println(">>> " + in_job_counter + " arrived, in queue/schedule " + getQueueSize() + " jobs, requiring " + getQueueCPUSize()
+                    System.out.println(">>> " + in_job_counter + " arrived so far, in queue/schedule " + getQueueSize() + " jobs, requiring " + getQueueCPUSize()
                             + " CPUs, held jobs " + hold_queue.size() + " running " + getRunningJobs()
                             + " jobs, free CPUs " + getFreeCPUs() + ", free RAM " + Math.round(getFreeRAM() / (1024.0 * 1024)) + " GB, free GPUs " + getFreeGPUs() + ", "
                             + "tried jobs " + tried_queue.size() + ", Day: " + dated + " SimClock: " + Math.round(clock()));
@@ -1263,6 +1290,7 @@ public class Scheduler extends GridSim {
         if (end_of_submission && received == in_job_counter) {
             //ExperimentSetup.result_collector.recordSystemThroughput(clock(), ExperimentSetup.users);//started
             //ExperimentSetup.result_collector.recordFairshareFactor(clock(), ExperimentSetup.users);
+            Scheduler.final_makespan = GridSim.clock();
             ExperimentSetup.result_collector.recordUserUsage(clock(), ExperimentSetup.users);
 
             // turn off the JobLoader
@@ -1281,7 +1309,7 @@ public class Scheduler extends GridSim {
 
         if (ev.get_tag() == GridSimTags.END_OF_SIMULATION) {
             // write out final results
-            System.out.println("---------------------------- End Of Simulation - CALLING RESULT COLLECTOR ------------------------------------");
+            System.out.println("---------------------------- End Of Simulation at time: "+Math.round(GridSim.clock())+" - CALLING RESULT COLLECTOR ------------------------------------");
             System.out.println("---------------------------- Event optimization performed = " + event_opt + " times. -------------------------");
             System.out.println("---------------------------- Cancelled due miss. property = " + bad + " jobs. -------------------------");
             //rc.computeResults(av_PEs, wav_PEs, failure_time, wfailure_time, clock, runtime, classic_load, max_load, submitted);
@@ -1369,7 +1397,8 @@ public class Scheduler extends GridSim {
         long freeRAM = 0;
         for (int i = 0; i < resourceInfoList.size(); i++) {
             ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
-            MachineList machines = ri.resource.getMachineList();
+            //MachineList machines = ri.resource.getMachineList();
+            ArrayList machines = new ArrayList<>(ri.resource.getMachineList());
             for (int ii = 0; ii < machines.size(); ii++) {
                 MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(ii);
                 freeRAM += machine.getFreeRam();
@@ -1382,7 +1411,9 @@ public class Scheduler extends GridSim {
         long freeGPUs = 0;
         for (int i = 0; i < resourceInfoList.size(); i++) {
             ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
-            MachineList machines = ri.resource.getMachineList();
+            //MachineList machines = ri.resource.getMachineList();
+            ArrayList machines = new ArrayList<>(ri.resource.getMachineList());
+            
             for (int ii = 0; ii < machines.size(); ii++) {
                 MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(ii);
                 freeGPUs += machine.getFreeGPUs();
@@ -2005,6 +2036,7 @@ public class Scheduler extends GridSim {
         TimeSeriesCollection dataset_cluster_used = new TimeSeriesCollection();
         TimeSeriesCollection dataset_system_usage = new TimeSeriesCollection();
         dataset_system_usage.addSeries(series_system_usage);
+        dataset_system_usage.addSeries(series_alloc_usage);
 
         for (int i = 0; i < resourceInfoList.size(); i++) {
             ResourceInfo ri = (ResourceInfo) resourceInfoList.get(i);
@@ -2016,19 +2048,19 @@ public class Scheduler extends GridSim {
         int height = ExperimentSetup.chart_height;
 
         String yaxis = "used quota (# of CPUs)";
-        if (ExperimentSetup.allocate_whole_nodes) {
+        if (ExperimentSetup.all_jobs_allocate_whole_nodes) {
             yaxis = "used quota (# of nodes)";
         }
 
         TimeSeriesChart user_usage = new TimeSeriesChart("User Used Quota (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_usage, false, width, height, yaxis, 0);
         TimeSeriesChart user_waiting = new TimeSeriesChart("User Waiting Jobs (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_waiting_jobs, false, width, height, "waiting jobs", 1);
         TimeSeriesChart cluster_usage = new TimeSeriesChart("Cluster Usage % (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_cluster_usage, false, width, height, "CPU usage (%)", 2);
-        TimeSeriesAreaChart system_usage = new TimeSeriesAreaChart("Overal System Usage % (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_system_usage, false, width, height, "CPU usage (%)", 3);
+        TimeSeriesAreaChart system_usage = new TimeSeriesAreaChart("Overal System Usage % (sample based)", Scheduler.scheduling_algorithm + " (sampling period: " + ExperimentSetup.sample_tick + "s)", dataset_system_usage, true, width, height, "CPU usage (%)", 3);
         ScatterChart wait_scatter = new ScatterChart("Wait times (minutes) wrt. arrivals", Scheduler.scheduling_algorithm, false, width, height, "wait time (m)", "arrival time (s)", 4);
         BoxPlotChart wait_boxplot = new BoxPlotChart("Distr. of wait time (minutes) wrt. users ", Scheduler.scheduling_algorithm, "users", "wait time (minutes)", width, height, 4);
 
         yaxis = "# of used CPUs";
-        if (ExperimentSetup.allocate_whole_nodes) {
+        if (ExperimentSetup.all_jobs_allocate_whole_nodes) {
             yaxis = "# of used nodes";
         }
         if (ExperimentSetup.basic_charts == false) {

@@ -8,7 +8,6 @@ import alea.core.AleaSimTags;
 import gridsim.GridSim;
 import gridsim.GridSimTags;
 import gridsim.Gridlet;
-import gridsim.MachineList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -20,6 +19,7 @@ import xklusac.environment.MachineWithRAMandGPUs;
 import xklusac.environment.ResourceInfo;
 import xklusac.environment.Scheduler;
 import xklusac.environment.User;
+import xklusac.extensions.FairshareFactorAndJobSizeComparator;
 import xklusac.extensions.FairshareFactorAndJobIDComparator;
 
 /**
@@ -81,12 +81,16 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
         for (int q = 0; q < Scheduler.all_queues.size(); q++) {
             Scheduler.active_scheduling_queue = Scheduler.all_queues.get(q);
             //System.out.println(Scheduler.all_queues_names.get(q) + " has " + Scheduler.active_scheduling_queue.size() + " jobs and priority " + ExperimentSetup.queues.get(Scheduler.all_queues_names.get(q)).getPriority());
-            
+
             if (ExperimentSetup.use_fairshare) {
                 scheduler.resetTemporaryUsageAndUpdateFF();
                 System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
                 Collections.sort(Scheduler.active_scheduling_queue, new FairshareFactorAndJobIDComparator());
+                //Collections.sort(Scheduler.active_scheduling_queue, new FairshareFactorAndJobSizeComparator());
             }
+            
+            //printQueuedJobs(Scheduler.active_scheduling_queue, Scheduler.all_queues_names.get(q));
+            //printUserStats(Scheduler.active_scheduling_queue, Scheduler.all_queues_names.get(q));
 
             if (Scheduler.active_scheduling_queue.size() > 0 && gridlet_with_reservation == null) {
                 //System.out.println("START EASY in queue: " + Scheduler.all_queues_names.get(q) + " with " + Scheduler.active_scheduling_queue.size() + " jobs at:" + Math.round(GridSim.clock()));
@@ -132,14 +136,14 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
                     for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
                         ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
                         if (Scheduler.isSuitable(ri, gi)) {
-                            System.out.println("====== find preemptable jobs for: " + gi.getID()+" from "+gi.getQueue()+" at position "+job_position);
+                            System.out.println("====== find preemptable jobs for: " + gi.getID() + " from " + gi.getQueue() + " at position " + job_position);
                             LinkedList<GridletInfo> checkpointed_jobs = ri.findAndCheckpointJobs(gi, gridlet_priority_level);
                             //System.out.println("=========end of finding==========");
                             boolean success = false;
                             if (checkpointed_jobs != null) {
                                 success = true;
                                 System.out.println("=========== initiate preemption ================");
-                                System.out.println(gi.getID() + " needs " + gi.getNumNodes()+ "x"+gi.getPpn()+" CPUs, resource_" + ri.resource.getResourceName() + " now has " + ri.getNumFreePE() + " at time: " + GridSim.clock());
+                                System.out.println(gi.getID() + " needs " + gi.getNumNodes() + "x" + gi.getPpn() + " CPUs, resource_" + ri.resource.getResourceName() + " now has " + ri.getNumFreePE() + " at time: " + GridSim.clock());
                                 System.out.println(gi.getID() + ": EASY -> PREEMPT these " + printCheckpointedJobs(checkpointed_jobs) + " jobs. This job has status = " + gi.getGridlet().getGridletStatusString());
                                 if (checkpointed_jobs.size() > 0) {
                                     Scheduler.waiting_for_preempted_job_to_arrive = true;
@@ -175,7 +179,11 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
                         scheduler.updateTemporaryUsageAndFFuponJobStart(gi);
                     }
                     // tell the JSS where to send which gridlet
-                    System.out.println("Job: " + gi.getID() + " scheduled from queue: " + Scheduler.all_queues_names.get(q) + " at time: " + Math.round(GridSim.clock()));
+                    String prefix = "";
+                    if (gi.getProperties().contains(":excl")) {
+                        prefix = "Exclusive ";
+                    }
+                    System.out.println(prefix + "Job: " + gi.getID() + " [" + gi.getNumNodes() + "x" + gi.getPpn() + "] scheduled from queue: " + Scheduler.all_queues_names.get(q) + " at time: " + Math.round(GridSim.clock()));
                     scheduler.submitJob(gi.getGridlet(), r_cand.resource.getResourceID());
                     succ = true;
                     r_cand.is_ready = true;
@@ -279,7 +287,11 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
                             scheduler.updateTemporaryUsageAndFFuponJobStart(gi);
                         }
                         // submit job
-                        System.out.println("Job: " + gi.getID() + " backfilled around reserved job: " + gridlet_with_reservation.getID() + " in queue: " + Scheduler.all_queues_names.get(q) + " at time: " + GridSim.clock());
+                        String prefix = "";
+                        if (gi.getProperties().contains(":excl")) {
+                            prefix = "Exclusive ";
+                        }
+                        System.out.println(prefix + "Job: " + gi.getID() + " [" + gi.getNumNodes() + "x" + gi.getPpn() + "] backfilled around reserved job: " + gridlet_with_reservation.getID() + " in queue: " + Scheduler.all_queues_names.get(q) + " at time: " + GridSim.clock());
                         scheduler.submitJob(gi.getGridlet(), ri.resource.getResourceID());
                         gi.getGridlet().setBackfilled(1);
                         ExperimentSetup.backfilled++;
@@ -322,19 +334,21 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
             ResourceInfo ri = (ResourceInfo) eligible_resources.get(j);
             if (Scheduler.isSuitable(ri, gi) && ri.canExecuteNow(gi) && ri.resource.getResourceID() == rsv_res.resource.getResourceID()) {
                 double eft = GridSim.clock() + gi.getJobRuntime(ri.peRating);
-                gi.setExpectedFinishTime(eft);
+                //gi.setExpectedFinishTime(eft);
 
                 // either the filler job terminates before start time of the first job (reservation=OK) or it can use other free CPUs (no collision with reservation)
                 //if ((eft < reserved_resource.est) || reserved_resource.usablePEs >= gi.getNumPE()) {
                 if ((eft < rsv_res.est)) {
                     //System.out.println("BANS ignored, end "+eft+" < EST " + rsv_res.est);
                     gi.getGridlet().setIs_using_reserved_resource(false);
+                    gi.setExpectedFinishTime(eft);
                     return ri;
                 } else {
                     boolean it_fits = ri.canGridletFitNextToReservation(gi, grsv);
                     if (it_fits) {
                         //System.out.println("MUST RESPECT BANS");
                         gi.getGridlet().setIs_using_reserved_resource(true);
+                        gi.setExpectedFinishTime(eft);
                         return ri;
                     }
 
@@ -372,7 +386,7 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
         String jobs = "";
         for (int i = 0; i < checkpointed_jobs.size(); i++) {
             GridletInfo gi = checkpointed_jobs.get(i);
-            jobs += gi.getID() + "["+gi.getNumNodes()+"x"+gi.getPpn()+"](nodes: "+gi.getGridlet().assigned_machines+"), ";
+            jobs += gi.getID() + "[" + gi.getNumNodes() + "x" + gi.getPpn() + "](nodes: " + gi.getGridlet().assigned_machines + "), ";
         }
         return jobs;
     }
@@ -384,12 +398,29 @@ public class FairshareEASY_BackfillingPreempt implements SchedulingPolicy {
         }
         System.out.println("] End of queue ");
     }
+    
+    private void printUserStats(LinkedList<GridletInfo> jobs, String qname) {
+        
+        
+        for (int us = 0; us < ExperimentSetup.user_logins.size(); us++) {
+                    User usr = ExperimentSetup.users.get(ExperimentSetup.user_logins.get(us));
+                    System.out.print(usr.getName() + "(queued:" + usr.getQueued_jobs() + "), ");
+        }
+        System.out.println();       
+        
+        System.out.print(qname + ": [");
+        for (int i = 0; i < Math.min(jobs.size(),1); i++) {
+            System.out.print(jobs.get(i).getID() + "(" + jobs.get(i).getUser() + "),");
+        }
+        System.out.println("]");
+    }
 
     // deletes old reservations from previous invocations
     private void deletePreviousReservations() {
         for (int j = 0; j < Scheduler.resourceInfoList.size(); j++) {
             ResourceInfo ri = (ResourceInfo) Scheduler.resourceInfoList.get(j);
-            MachineList machines = ri.resource.getMachineList();
+            //MachineList machines = ri.resource.getMachineList();
+            ArrayList machines = new ArrayList<>(ri.resource.getMachineList());
             //System.out.println(this.resource.getResourceName()+ " Machines: "+machines.size());
             for (int i = 0; i < machines.size(); i++) {
                 MachineWithRAMandGPUs machine = (MachineWithRAMandGPUs) machines.get(i);
